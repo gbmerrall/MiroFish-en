@@ -2,6 +2,9 @@
 
 <img src="./static/image/MiroFish_logo_compressed.jpeg" alt="MiroFish Logo" width="75%"/>
 
+**[English Translation Version]**
+*This project is an English-translated fork of the original [MiroFish](https://github.com/666ghj/MiroFish) project. Translation was performed by AI*
+
 <a href="https://trendshift.io/repositories/16144" target="_blank"><img src="https://trendshift.io/api/badge/repositories/16144" alt="666ghj%2FMiroFish | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 A Simple and Universal Swarm Intelligence Engine, Predicting Anything
@@ -182,11 +185,17 @@ Reads `.env` from root directory by default, maps ports `3000 (frontend) / 5001 
 
 The MiroFish team is recruiting full-time/internship positions. If you're interested in multi-agent simulation and LLM applications, feel free to send your resume to: **mirofish@shanda.com**
 
-## 📄 Acknowledgments
+## 📄 Acknowledgments & Attribution
 
-**MiroFish has received strategic support and incubation from Shanda Group!**
+**This project is a modified version and English translation of the original [MiroFish](https://github.com/666ghj/MiroFish) repository.**
 
-MiroFish's simulation engine is powered by **[OASIS (Open Agent Social Interaction Simulations)](https://github.com/camel-ai/oasis)**, We sincerely thank the CAMEL-AI team for their open-source contributions!
+- **Original Author**: [666ghj](https://github.com/666ghj)
+- **Original Repository**: [https://github.com/666ghj/MiroFish](https://github.com/666ghj/MiroFish)
+- **License**: This project is licensed under the [AGPL-3.0 License](./LICENSE), following the copyleft requirements of the original work.
+
+MiroFish has received strategic support and incubation from Shanda Group!
+
+MiroFish's simulation engine is powered by **[OASIS (Open Agent Social Interaction Simulations)](https://github.com/camel-ai/oasis)**. We sincerely thank the CAMEL-AI team for their open-source contributions!
 
 ## 📈 Project Statistics
 
