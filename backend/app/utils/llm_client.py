@@ -92,10 +92,8 @@ class LLMClient:
         )
         # Clean up markdown code block tags
         cleaned_response = response.strip()
-        cleaned_response = re.sub(r'^```(?:json)?\s*
-?', '', cleaned_response, flags=re.IGNORECASE)
-        cleaned_response = re.sub(r'
-?```\s*$', '', cleaned_response)
+        cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
+        cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
         cleaned_response = cleaned_response.strip()
 
         try:

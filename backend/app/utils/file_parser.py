@@ -108,9 +108,7 @@ class FileParser:
                 if text.strip():
                     text_parts.append(text)
         
-        return "
-
-".join(text_parts)
+        return "\n\n".join(text_parts)
     
     @staticmethod
     def _extract_from_md(file_path: str) -> str:
@@ -139,14 +137,11 @@ class FileParser:
             try:
                 text = cls.extract_text(file_path)
                 filename = Path(file_path).name
-                all_texts.append(f"=== Document {i}: {filename} ===
-{text}")
+                all_texts.append(f"=== Document {i}: {filename} ===\n{text}")
             except Exception as e:
                 all_texts.append(f"=== Document {i}: {file_path} (Extraction failed: {str(e)}) ===")
         
-        return "
-
-".join(all_texts)
+        return "\n\n".join(all_texts)
 
 
 def split_text_into_chunks(
@@ -177,12 +172,7 @@ def split_text_into_chunks(
         # Try to split at sentence boundaries
         if end < len(text):
             # Find the nearest sentence terminator
-            for sep in ['.', '!', '?', '.
-', '!
-', '?
-', '
-
-', '. ', '! ', '? ']:
+            for sep in ['.', '!', '?', '.\n', '!\n', '?\n', '\n\n', '. ', '! ', '? ']:
                 last_sep = text[start:end].rfind(sep)
                 if last_sep != -1 and last_sep > chunk_size * 0.3:
                     end = start + last_sep + len(sep)
