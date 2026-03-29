@@ -12,23 +12,20 @@ dependencies = [
     # Core framework
     "flask>=3.0.0",
     "flask-cors>=6.0.0",
-    
     # LLM related
     "openai>=1.0.0",
-    
     # Zep Cloud
-    "zep-cloud==3.13.0",
-    
+    # Graphiti + FalkorDB (Migration from Zep)
+    "graphiti-core>=0.3.0",
+    "falkordb>=1.1.2",
     # OASIS Social Media Simulation
     "camel-oasis==0.2.5",
     "camel-ai==0.2.78",
-    
     # File processing
     "PyMuPDF>=1.24.0",
     # Encoding detection (supports non-UTF-8 encoded text files)
     "charset-normalizer>=3.0.0",
     "chardet>=5.0.0",
-    
     # Utility libraries
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
