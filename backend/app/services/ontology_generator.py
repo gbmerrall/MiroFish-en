@@ -284,7 +284,7 @@ Please design entity types and relationship types suitable for social media publ
             if len(edge.get("description", "")) > 100:
                 edge["description"] = edge["description"][:97] + "..."
         
-        # Zep API limits: max 10 custom entity types, max 10 custom edge types
+        # Graphiti API limits: max 10 custom entity types, max 10 custom edge types
         MAX_ENTITY_TYPES = 10
         MAX_EDGE_TYPES = 10
         
@@ -361,7 +361,6 @@ Please design entity types and relationship types suitable for social media publ
             '"""',
             '',
             'from pydantic import Field',
-            'from zep_cloud.external_clients.ontology import EntityModel, EntityText, EdgeModel',
             '',
             '',
             '# ============== Entity Type Definitions ==============',
