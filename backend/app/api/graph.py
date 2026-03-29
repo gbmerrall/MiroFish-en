@@ -403,7 +403,7 @@ def build_graph():
                 # Create graph
                 task_manager.update_task(
                     task_id,
-                    message="Creating Zep graph...",
+                    message="Creating Graphiti graph...",
                     progress=10
                 )
                 graph_id = builder.create_graph(name=graph_name)
@@ -442,10 +442,10 @@ def build_graph():
                     progress_callback=add_progress_callback
                 )
                 
-                # Wait for Zep to finish processing (query processed status of each episode)
+                # Wait for Graphiti to finish processing (query processed status of each episode)
                 task_manager.update_task(
                     task_id,
-                    message="Waiting for Zep to process data...",
+                    message="Waiting for Graphiti to process data...",
                     progress=55
                 )
                 
@@ -595,7 +595,7 @@ def get_graph_data(graph_id: str):
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
 def delete_graph(graph_id: str):
     """
-    Delete Zep graph
+    Delete Graphiti graph
     """
     try:
         if not Config.ZEP_API_KEY:

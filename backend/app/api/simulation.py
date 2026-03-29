@@ -1,20 +1,22 @@
 """
 Simulation related API routes
-Step2: Zep entity reading and filtering, OASIS simulation preparation and execution (fully automated)
+Step2: Graphiti entity reading and filtering, OASIS simulation preparation and execution (fully automated)
 """
 
 import os
 import traceback
 import threading
 import random
+from datetime import datetime
 from flask import request, jsonify, send_file
 
 from . import simulation_bp
 from ..config import Config
-from ..services.zep_entity_reader import ZepEntityReader
+from ..services.graph_entity_reader import GraphitiEntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
+from ..services.graph_tools import GraphToolsService
 from ..utils.logger import get_logger
 from ..models.project import ProjectManager
 
@@ -70,7 +72,7 @@ def get_graph_entities(graph_id: str):
         
         logger.info(f"Getting graph entities: graph_id={graph_id}, entity_types={entity_types}, enrich={enrich}")
         
-        reader = ZepEntityReader()
+        reader = GraphitiEntityReader()
         result = reader.filter_defined_entities(
             graph_id=graph_id,
             defined_entity_types=entity_types,
@@ -101,7 +103,7 @@ def get_entity_detail(graph_id: str, entity_uuid: str):
                 "error": "ZEP_API_KEY is not configured"
             }), 500
         
-        reader = ZepEntityReader()
+        reader = GraphitiEntityReader()
         entity = reader.get_entity_with_context(graph_id, entity_uuid)
         
         if not entity:
@@ -136,7 +138,7 @@ def get_entities_by_type(graph_id: str, entity_type: str):
         
         enrich = request.args.get('enrich', 'true').lower() == 'true'
         
-        reader = ZepEntityReader()
+        reader = GraphitiEntityReader()
         entities = reader.get_entities_by_type(
             graph_id=graph_id,
             entity_type=entity_type,
@@ -372,7 +374,7 @@ def prepare_simulation():
     
     Steps:
     1. Check if preparation work is already completed
-    2. Read and filter entities from the Zep graph
+    2. Read and filter entities from the Graphiti graph
     3. Generate OASIS Agent Profiles for each entity (with retry mechanism)
     4. LLM intelligently generates simulation configuration (with retry mechanism)
     5. Save configuration files and preset scripts
@@ -473,7 +475,7 @@ def prepare_simulation():
         # This allows the frontend to immediately get the expected total number of Agents after calling prepare
         try:
             logger.info(f"Synchronously getting entity count: graph_id={state.graph_id}")
-            reader = ZepEntityReader()
+            reader = GraphitiEntityReader()
             # Quickly read entities (no edge information needed, only count)
             filtered_preview = reader.filter_defined_entities(
                 graph_id=state.graph_id,
@@ -1400,7 +1402,7 @@ def generate_profiles():
         use_llm = data.get('use_llm', True)
         platform = data.get('platform', 'reddit')
         
-        reader = ZepEntityReader()
+        reader = GraphitiEntityReader()
         filtered = reader.filter_defined_entities(
             graph_id=graph_id,
             defined_entity_types=entity_types,
@@ -1457,7 +1459,7 @@ def start_simulation():
             "simulation_id": "sim_xxxx",          // Required, simulation ID
             "platform": "parallel",                // Optional: twitter / reddit / parallel (default)
             "max_rounds": 100,                     // Optional: Maximum number of simulation rounds, for truncating long simulations
-            "enable_graph_memory_update": false,   // Optional: Whether to dynamically update Agent activities to Zep graph memory
+            "enable_graph_memory_update": false,   // Optional: Whether to dynamically update Agent activities to Graphiti graph memory
             "force": false                         // Optional: Force restart (will stop running simulation and clean up logs)
         }
 
@@ -1468,7 +1470,7 @@ def start_simulation():
         - Applicable to scenarios where simulation needs to be rerun
 
     Regarding enable_graph_memory_update:
-        - If enabled, all Agent activities (posting, commenting, liking, etc.) in the simulation will be updated to the Zep graph in real-time
+        - If enabled, all Agent activities (posting, commenting, liking, etc.) in the simulation will be updated to the Graphiti graph in real-time
         - This allows the graph to "remember" the simulation process, for subsequent analysis or AI conversations
         - Requires the associated project to have a valid graph_id
         - Uses batch update mechanism to reduce API calls
@@ -2293,19 +2295,17 @@ def get_simulation_graph_stats(simulation_id: str):
             }), 404
         
         # Get the latest statistics for the graph
-        # This requires calling the Zep interface to get real-time graph statistics
-        # Simplified handling: assume the following statistics are available
+        # This requires calling the Graphiti interface to get real-time graph statistics
         graph_id = state.graph_id
         
         try:
-            import zep_cloud
-            zep_client = zep_cloud.Client(api_key=Config.ZEP_API_KEY)
-            zep_graph = zep_client.graph.get(graph_id)
+            tools = GraphToolsService()
+            stats = tools.get_graph_statistics(graph_id)
             
-            node_count = zep_graph.node_count
-            edge_count = zep_graph.edge_count
-            # Zep does not have direct community statistics, this can be implemented as needed
-            community_count = 5  # Example value
+            node_count = stats.get("total_nodes", 0)
+            edge_count = stats.get("total_edges", 0)
+            # Graphiti/FalkorDB doesn't have direct community statistics yet
+            community_count = len(stats.get("entity_types", {}))
             
             return jsonify({
                 "success": True,
@@ -2320,10 +2320,10 @@ def get_simulation_graph_stats(simulation_id: str):
             })
             
         except Exception as e:
-            logger.error(f"Failed to get graph statistics from Zep: {str(e)}")
+            logger.error(f"Failed to get graph statistics from Graphiti: {str(e)}")
             return jsonify({
                 "success": False,
-                "error": f"Failed to get graph statistics from Zep: {str(e)}"
+                "error": f"Failed to get graph statistics from Graphiti: {str(e)}"
             }), 500
             
     except Exception as e:

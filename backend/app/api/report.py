@@ -956,9 +956,9 @@ def search_graph_tool():
                 "error": "Please provide graph_id and query"
             }), 400
         
-        from ..services.zep_tools import ZepToolsService
+        from ..services.graph_tools import GraphitiToolsService
         
-        tools = ZepToolsService()
+        tools = GraphitiToolsService()
         result = tools.search_graph(
             graph_id=graph_id,
             query=query,
@@ -1000,9 +1000,9 @@ def get_graph_statistics_tool():
                 "error": "Please provide graph_id"
             }), 400
         
-        from ..services.zep_tools import ZepToolsService
+        from ..services.graph_tools import GraphitiToolsService
         
-        tools = ZepToolsService()
+        tools = GraphitiToolsService()
         result = tools.get_graph_statistics(graph_id)
         
         return jsonify({
