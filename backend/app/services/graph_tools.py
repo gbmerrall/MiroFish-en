@@ -14,7 +14,7 @@ from ..utils.graph_paging import fetch_all_nodes, fetch_all_edges
 from ..utils.llm_client import LLMClient
 from ..utils.logger import get_logger
 
-logger = get_logger('mirofish.graph_tools')
+logger = get_logger("mirofish.graph_tools")
 
 
 @dataclass
@@ -27,12 +27,18 @@ class SearchResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "facts": self.facts, "edges": self.edges,
-            "nodes": self.nodes, "query": self.query, "total_count": self.total_count,
+            "facts": self.facts,
+            "edges": self.edges,
+            "nodes": self.nodes,
+            "query": self.query,
+            "total_count": self.total_count,
         }
 
     def to_text(self) -> str:
-        parts = [f"Search Query: {self.query}", f"Found {self.total_count} relevant pieces of information"]
+        parts = [
+            f"Search Query: {self.query}",
+            f"Found {self.total_count} relevant pieces of information",
+        ]
         if self.facts:
             parts.append("\n### Related Facts:")
             parts.extend(f"{i}. {f}" for i, f in enumerate(self.facts, 1))
@@ -48,11 +54,18 @@ class NodeInfo:
     attributes: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
-        return {"uuid": self.uuid, "name": self.name, "labels": self.labels,
-                "summary": self.summary, "attributes": self.attributes}
+        return {
+            "uuid": self.uuid,
+            "name": self.name,
+            "labels": self.labels,
+            "summary": self.summary,
+            "attributes": self.attributes,
+        }
 
     def to_text(self) -> str:
-        entity_type = next((l for l in self.labels if l not in ("Entity", "Node")), "Unknown")
+        entity_type = next(
+            (label for label in self.labels if label not in ("Entity", "Node")), "Unknown"
+        )
         return f"Entity: {self.name} (Type: {entity_type})\nSummary: {self.summary}"
 
 
@@ -78,7 +91,9 @@ class EdgeInfo:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "uuid": self.uuid, "name": self.name, "fact": self.fact,
+            "uuid": self.uuid,
+            "name": self.name,
+            "fact": self.fact,
             "source_node_uuid": self.source_node_uuid,
             "target_node_uuid": self.target_node_uuid,
             "created_at": str(self.created_at) if self.created_at else None,
@@ -98,9 +113,11 @@ class InsightForgeResult:
     relationship_chains: list[str] = field(default_factory=list)
 
     def to_text(self) -> str:
-        parts = [f"Deep Insight for: {self.query}",
-                 f"Sub-questions explored: {len(self.sub_queries)}",
-                 f"Facts retrieved: {len(self.semantic_facts)}"]
+        parts = [
+            f"Deep Insight for: {self.query}",
+            f"Sub-questions explored: {len(self.sub_queries)}",
+            f"Facts retrieved: {len(self.semantic_facts)}",
+        ]
         if self.semantic_facts:
             parts.append("\n### Key Facts:")
             parts.extend(f"- {f}" for f in self.semantic_facts[:20])
@@ -189,7 +206,9 @@ class GraphToolsService:
         finally:
             await graphiti.close()
 
-    def get_all_edges(self, group_id: str, include_temporal: bool = True) -> list[EdgeInfo]:
+    def get_all_edges(
+        self, group_id: str, include_temporal: bool = True
+    ) -> list[EdgeInfo]:
         return asyncio.run(self._async_get_all_edges(group_id))
 
     async def _async_get_all_edges(self, group_id: str) -> list[EdgeInfo]:
@@ -203,10 +222,10 @@ class GraphToolsService:
                     fact=e.fact or "",
                     source_node_uuid=e.source_node_uuid or "",
                     target_node_uuid=e.target_node_uuid or "",
-                    created_at=getattr(e, 'created_at', None),
-                    valid_at=getattr(e, 'valid_at', None),
-                    invalid_at=getattr(e, 'invalid_at', None),
-                    expired_at=getattr(e, 'expired_at', None),
+                    created_at=getattr(e, "created_at", None),
+                    valid_at=getattr(e, "valid_at", None),
+                    invalid_at=getattr(e, "invalid_at", None),
+                    expired_at=getattr(e, "expired_at", None),
                 )
                 for e in raw
             ]
@@ -243,29 +262,35 @@ class GraphToolsService:
         edges = []
         nodes = []
 
-        for edge in getattr(results, 'edges', []) or []:
+        for edge in getattr(results, "edges", []) or []:
             if edge.fact:
                 facts.append(edge.fact)
-            edges.append({
-                "uuid": edge.uuid or "",
-                "name": edge.name or "",
-                "fact": edge.fact or "",
-                "source_node_uuid": edge.source_node_uuid or "",
-                "target_node_uuid": edge.target_node_uuid or "",
-            })
+            edges.append(
+                {
+                    "uuid": edge.uuid or "",
+                    "name": edge.name or "",
+                    "fact": edge.fact or "",
+                    "source_node_uuid": edge.source_node_uuid or "",
+                    "target_node_uuid": edge.target_node_uuid or "",
+                }
+            )
 
-        for node in getattr(results, 'nodes', []) or []:
-            nodes.append({
-                "uuid": node.uuid or "",
-                "name": node.name or "",
-                "labels": node.labels or [],
-                "summary": node.summary or "",
-            })
+        for node in getattr(results, "nodes", []) or []:
+            nodes.append(
+                {
+                    "uuid": node.uuid or "",
+                    "name": node.name or "",
+                    "labels": node.labels or [],
+                    "summary": node.summary or "",
+                }
+            )
             if node.summary:
                 facts.append(f"[{node.name}]: {node.summary}")
 
         logger.info(f"Search found {len(facts)} facts")
-        return SearchResult(facts=facts, edges=edges, nodes=nodes, query=query, total_count=len(facts))
+        return SearchResult(
+            facts=facts, edges=edges, nodes=nodes, query=query, total_count=len(facts)
+        )
 
     def _local_search_sync(
         self, group_id: str, query: str, limit: int, scope: str
@@ -276,7 +301,7 @@ class GraphToolsService:
         all_nodes = self.get_all_nodes(group_id)
 
         query_lower = query.lower()
-        keywords = [w for w in query_lower.replace(',', ' ').split() if len(w) > 1]
+        keywords = [w for w in query_lower.replace(",", " ").split() if len(w) > 1]
 
         def score(text: str) -> int:
             if not text:
@@ -291,7 +316,8 @@ class GraphToolsService:
         if scope in ("edges", "both"):
             scored = sorted(
                 ((score(e.fact) + score(e.name), e) for e in all_edges),
-                key=lambda x: x[0], reverse=True
+                key=lambda x: x[0],
+                reverse=True,
             )
             for s, edge in scored[:limit]:
                 if s > 0:
@@ -302,7 +328,8 @@ class GraphToolsService:
         if scope in ("nodes", "both"):
             scored = sorted(
                 ((score(n.name) + score(n.summary), n) for n in all_nodes),
-                key=lambda x: x[0], reverse=True
+                key=lambda x: x[0],
+                reverse=True,
             )
             for s, node in scored[:limit]:
                 if s > 0:
@@ -310,8 +337,13 @@ class GraphToolsService:
                     if node.summary:
                         facts.append(f"[{node.name}]: {node.summary}")
 
-        return SearchResult(facts=facts, edges=edges_result, nodes=nodes_result,
-                            query=query, total_count=len(facts))
+        return SearchResult(
+            facts=facts,
+            edges=edges_result,
+            nodes=nodes_result,
+            query=query,
+            total_count=len(facts),
+        )
 
     # ---- Higher-level tools ----
 
@@ -339,8 +371,11 @@ class GraphToolsService:
 
     def get_node_edges(self, group_id: str, node_uuid: str) -> list[EdgeInfo]:
         all_edges = self.get_all_edges(group_id)
-        return [e for e in all_edges
-                if e.source_node_uuid == node_uuid or e.target_node_uuid == node_uuid]
+        return [
+            e
+            for e in all_edges
+            if e.source_node_uuid == node_uuid or e.target_node_uuid == node_uuid
+        ]
 
     def get_entities_by_type(self, group_id: str, entity_type: str) -> list[NodeInfo]:
         return [n for n in self.get_all_nodes(group_id) if entity_type in n.labels]
@@ -348,8 +383,12 @@ class GraphToolsService:
     def get_entity_summary(self, group_id: str, entity_name: str) -> dict[str, Any]:
         search_result = self.search_graph(group_id, entity_name, limit=20)
         all_nodes = self.get_all_nodes(group_id)
-        entity_node = next((n for n in all_nodes if n.name.lower() == entity_name.lower()), None)
-        related_edges = self.get_node_edges(group_id, entity_node.uuid) if entity_node else []
+        entity_node = next(
+            (n for n in all_nodes if n.name.lower() == entity_name.lower()), None
+        )
+        related_edges = (
+            self.get_node_edges(group_id, entity_node.uuid) if entity_node else []
+        )
         return {
             "entity_name": entity_name,
             "entity_info": entity_node.to_dict() if entity_node else None,
@@ -366,7 +405,7 @@ class GraphToolsService:
             for label in node.labels:
                 if label not in ("Entity", "Node"):
                     entity_types[label] = entity_types.get(label, 0) + 1
-        
+
         relation_types: dict[str, int] = {}
         for edge in edges:
             relation_types[edge.name] = relation_types.get(edge.name, 0) + 1

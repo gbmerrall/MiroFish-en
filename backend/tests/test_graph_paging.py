@@ -55,7 +55,7 @@ async def test_fetch_all_nodes_paginates():
     from app.utils.graph_paging import fetch_all_nodes
 
     page1 = [_make_node(f"uuid-{i}", f"Node{i}") for i in range(100)]
-    page2 = [_make_node(f"uuid-{i+100}", f"Node{i+100}") for i in range(5)]
+    page2 = [_make_node(f"uuid-{i + 100}", f"Node{i + 100}") for i in range(5)]
 
     call_count = 0
 

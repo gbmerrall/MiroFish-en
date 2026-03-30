@@ -33,9 +33,15 @@ def test_agent_activity_skips_do_nothing():
             updater._activity_queue.put = MagicMock()
 
     from app.services.graph_memory_updater import AgentActivity
+
     activity = AgentActivity(
-        platform="twitter", agent_id=1, agent_name="Bob",
-        action_type="DO_NOTHING", action_args={}, round_num=1, timestamp="",
+        platform="twitter",
+        agent_id=1,
+        agent_name="Bob",
+        action_type="DO_NOTHING",
+        action_args={},
+        round_num=1,
+        timestamp="",
     )
 
     updater.add_activity(activity)
@@ -55,8 +61,11 @@ def test_graph_memory_manager_creates_and_retrieves_updater():
     mock_updater = MagicMock()
     mock_updater.stop = MagicMock()
 
-    with patch("app.services.graph_memory_updater.GraphMemoryUpdater", return_value=mock_updater):
+    with patch(
+        "app.services.graph_memory_updater.GraphMemoryUpdater",
+        return_value=mock_updater,
+    ):
         mock_updater.start = MagicMock()
-        result = GraphMemoryManager.create_updater("sim-1", "group-abc")
+        GraphMemoryManager.create_updater("sim-1", "group-abc")
 
     assert GraphMemoryManager.get_updater("sim-1") is mock_updater

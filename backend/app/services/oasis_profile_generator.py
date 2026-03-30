@@ -21,27 +21,38 @@ from ..utils.logger import get_logger
 from ..utils.graphiti_client import create_graphiti_client
 from .graph_entity_reader import EntityNode
 
-logger = get_logger('mirofish.oasis_profile')
+logger = get_logger("mirofish.oasis_profile")
 
 
 @dataclass
 class OasisAgentProfile:
     """OASIS Agent Profile"""
+
     user_id: int
+    user_name: str
     name: str
+    bio: str
     persona: str
-    mbti: str
-    country: str
-    profession: str
-    interested_topics: List[str]
-    source_entity_uuid: str
-    source_entity_type: str
+    mbti: str = "Unknown"
+    country: str = "Unknown"
+    profession: str = "Unknown"
+    interested_topics: List[str] = field(default_factory=list)
+    source_entity_uuid: str = ""
+    source_entity_type: str = ""
+    karma: int = 0
+    friend_count: int = 0
+    follower_count: int = 0
+    statuses_count: int = 0
+    age: Optional[int] = None
+    gender: Optional[str] = None
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "user_id": self.user_id,
+            "user_name": self.user_name,
             "name": self.name,
+            "bio": self.bio,
             "persona": self.persona,
             "mbti": self.mbti,
             "country": self.country,
@@ -49,6 +60,12 @@ class OasisAgentProfile:
             "interested_topics": self.interested_topics,
             "source_entity_uuid": self.source_entity_uuid,
             "source_entity_type": self.source_entity_type,
+            "karma": self.karma,
+            "friend_count": self.friend_count,
+            "follower_count": self.follower_count,
+            "statuses_count": self.statuses_count,
+            "age": self.age,
+            "gender": self.gender,
             "created_at": self.created_at,
         }
 
@@ -56,106 +73,149 @@ class OasisAgentProfile:
 class OasisProfileGenerator:
     """
     OASIS Profile Generator
-    
+
     Converts entities from the Zep graph into Agent Profiles required by OASIS simulation.
-    
+
     Optimization features:
     1. Calls Zep graph retrieval function to get richer context
     2. Generates very detailed personas (including basic information, professional experience, personality traits, social media behavior, etc.)
     3. Distinguishes between individual entities and abstract group entities
     """
-    
+
     # MBTI type list
     MBTI_TYPES = [
-        "INTJ", "INTP", "ENTJ", "ENTP",
-        "INFJ", "INFP", "ENFJ", "ENFP",
-        "ISTJ", "ISFJ", "ESTJ", "ESFJ",
-        "ISTP", "ISFP", "ESTP", "ESFP"
+        "INTJ",
+        "INTP",
+        "ENTJ",
+        "ENTP",
+        "INFJ",
+        "INFP",
+        "ENFJ",
+        "ENFP",
+        "ISTJ",
+        "ISFJ",
+        "ESTJ",
+        "ESFJ",
+        "ISTP",
+        "ISFP",
+        "ESTP",
+        "ESFP",
     ]
-    
+
     # Common country list
     COUNTRIES = [
-        "China", "US", "UK", "Japan", "Germany", "France", 
-        "Canada", "Australia", "Brazil", "India", "South Korea"
+        "China",
+        "US",
+        "UK",
+        "Japan",
+        "Germany",
+        "France",
+        "Canada",
+        "Australia",
+        "Brazil",
+        "India",
+        "South Korea",
     ]
-    
+
     # Individual entity types (need to generate specific personas)
     INDIVIDUAL_ENTITY_TYPES = [
-        "student", "alumni", "professor", "person", "publicfigure", 
-        "expert", "faculty", "official", "journalist", "activist"
+        "student",
+        "alumni",
+        "professor",
+        "person",
+        "publicfigure",
+        "expert",
+        "faculty",
+        "official",
+        "journalist",
+        "activist",
     ]
-    
+
     # Group/institution entity types (need to generate representative personas)
     GROUP_ENTITY_TYPES = [
-        "university", "governmentagency", "organization", "ngo", 
-        "mediaoutlet", "company", "institution", "group", "community"
+        "university",
+        "governmentagency",
+        "organization",
+        "ngo",
+        "mediaoutlet",
+        "company",
+        "institution",
+        "group",
+        "community",
     ]
-    
+
     def __init__(
-        self, 
+        self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
-        graph_id: Optional[str] = None
+        graph_id: Optional[str] = None,
     ):
         self.api_key = api_key or Config.LLM_API_KEY
         self.base_url = base_url or Config.LLM_BASE_URL
         self.model_name = model_name or Config.LLM_MODEL_NAME
-        
+
         if not self.api_key:
             raise ValueError("LLM_API_KEY is not configured")
-        
-        self.client = OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
-        
+
+        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+
         self.graph_id = graph_id
-    
+
     def generate_profile_from_entity(
-        self, 
-        entity: EntityNode, 
-        user_id: int,
-        use_llm: bool = True
+        self, entity: EntityNode, user_id: int, use_llm: bool = True
     ) -> OasisAgentProfile:
         """
         Generates an OASIS Agent Profile from a Zep entity.
-        
+
         Args:
             entity: Entity node object
             user_id: OASIS platform user ID
             use_llm: Whether to use LLM to generate persona
-            
+
         Returns:
             OASIS Agent Profile
         """
         entity_name = entity.name
-        
+
         # Determine entity type
         source_type = entity.get_entity_type() or "Person"
-        
+
         # 1. Retrieve rich context (Zep retrieval)
         retrieval_results = self._retrieve_entity_context(entity)
-        
+
         # 2. Build complete context string
         full_context = self._build_entity_context(entity)
         if retrieval_results["context"]:
-            full_context += "\n\n### Additional Background (from Semantic Search)\n" + retrieval_results["context"]
-            
+            full_context += (
+                "\n\n### Additional Background (from Semantic Search)\n"
+                + retrieval_results["context"]
+            )
+
         # 3. Generate persona
         if use_llm:
-            persona_data = self._generate_persona_with_llm(entity_name, source_type, full_context)
-            
+            persona_data = self._generate_persona_with_llm(
+                entity_name, source_type, full_context
+            )
+
             return OasisAgentProfile(
                 user_id=user_id,
+                user_name=persona_data.get("user_name", f"user_{user_id}"),
                 name=persona_data.get("name", entity_name),
+                bio=persona_data.get("bio", f"Account for {entity_name}"),
                 persona=persona_data.get("persona", ""),
                 mbti=persona_data.get("mbti", random.choice(self.MBTI_TYPES)),
                 country=persona_data.get("country", random.choice(self.COUNTRIES)),
                 profession=persona_data.get("profession", ""),
                 interested_topics=persona_data.get("interested_topics", []),
                 source_entity_uuid=entity.uuid,
-                source_entity_type=source_type
+                source_entity_type=source_type,
+                karma=random.randint(100, 10000),
+                friend_count=random.randint(50, 5000),
+                follower_count=random.randint(10, 20000),
+                statuses_count=random.randint(50, 2000),
+                age=persona_data.get("age", random.randint(18, 70)),
+                gender=persona_data.get("gender", random.choice(["male", "female"])),
             )
         else:
             # Fallback to random generation
@@ -177,69 +237,73 @@ class OasisProfileGenerator:
     def _retrieve_entity_context(self, entity: EntityNode) -> Dict[str, Any]:
         """
         Retrieves rich context for an entity from the knowledge graph using semantic search.
-        
+
         Args:
             entity: Entity node object
-            
+
         Returns:
             Dictionary containing facts, node_summaries, and context
         """
-        results = {
-            "facts": [],
-            "node_summaries": [],
-            "context": ""
-        }
-        
+        results = {"facts": [], "node_summaries": [], "context": ""}
+
         # graph_id must be set for search
         if not self.graph_id:
             logger.debug("Skipping Graphiti retrieval: graph_id not set")
             return results
 
         entity_name = entity.name
-        
+
         try:
             search_result = asyncio.run(self._async_retrieve_context(entity_name))
-            
+
             all_facts = set()
-            for edge in getattr(search_result, 'edges', []) or []:
-                if getattr(edge, 'fact', None):
+            for edge in getattr(search_result, "edges", []) or []:
+                if getattr(edge, "fact", None):
                     all_facts.add(edge.fact)
             results["facts"] = list(all_facts)
-            
+
             all_summaries = set()
-            for node in getattr(search_result, 'nodes', []) or []:
-                if getattr(node, 'summary', None):
+            for node in getattr(search_result, "nodes", []) or []:
+                if getattr(node, "summary", None):
                     all_summaries.add(node.summary)
-                if getattr(node, 'name', None) and node.name != entity_name:
+                if getattr(node, "name", None) and node.name != entity_name:
                     all_summaries.add(f"Related entity: {node.name}")
             results["node_summaries"] = list(all_summaries)
-            
+
             # Build comprehensive context
             context_parts = []
             if results["facts"]:
-                context_parts.append("Fact information:\n" + "\n".join(f"- {f}" for f in results["facts"][:20]))
+                context_parts.append(
+                    "Fact information:\n"
+                    + "\n".join(f"- {f}" for f in results["facts"][:20])
+                )
             if results["node_summaries"]:
-                context_parts.append("Related entities:\n" + "\n".join(f"- {s}" for s in results["node_summaries"][:10]))
+                context_parts.append(
+                    "Related entities:\n"
+                    + "\n".join(f"- {s}" for s in results["node_summaries"][:10])
+                )
             results["context"] = "\n\n".join(context_parts)
-            
-            logger.info(f"Graphiti retrieval complete: {entity_name}, retrieved {len(results['facts'])} facts, {len(results['node_summaries'])} related nodes")
-            
+
+            logger.info(
+                f"Graphiti retrieval complete: {entity_name}, retrieved {len(results['facts'])} facts, {len(results['node_summaries'])} related nodes"
+            )
+
         except Exception as e:
             logger.warning(f"Graphiti retrieval failed ({entity_name}): {e}")
-        
+
         return results
 
     def _build_entity_context(self, entity: EntityNode) -> str:
         """
         Builds the complete context information for an entity.
-        
+
         Includes:
         1. Entity's own edge information (facts)
         2. Detailed information of associated nodes
         3. Rich information retrieved by Graphiti hybrid search
         """
         context_parts = []
-        
+
         # 1. Add entity attribute information
         if entity.attributes:
             attrs = []
@@ -248,7 +312,7 @@ class OasisProfileGenerator:
                     attrs.append(f"- {key}: {value}")
             if attrs:
                 context_parts.append("### Entity Attributes\n" + "\n".join(attrs))
-        
+
         # 2. Add related edge information (facts/relationships)
         existing_facts = set()
         if entity.related_edges:
@@ -257,19 +321,25 @@ class OasisProfileGenerator:
                 fact = edge.get("fact", "")
                 edge_name = edge.get("edge_name", "")
                 direction = edge.get("direction", "")
-                
+
                 if fact:
                     relationships.append(f"- {fact}")
                     existing_facts.add(fact)
                 elif edge_name:
                     if direction == "outgoing":
-                        relationships.append(f"- {entity.name} --[{edge_name}]--> (Related Entity)")
+                        relationships.append(
+                            f"- {entity.name} --[{edge_name}]--> (Related Entity)"
+                        )
                     else:
-                        relationships.append(f"- (Related Entity) --[{edge_name}]--> {entity.name}")
-            
+                        relationships.append(
+                            f"- (Related Entity) --[{edge_name}]--> {entity.name}"
+                        )
+
             if relationships:
-                context_parts.append("### Related Facts and Relationships\n" + "\n".join(relationships))
-        
+                context_parts.append(
+                    "### Related Facts and Relationships\n" + "\n".join(relationships)
+                )
+
         # 3. Add detailed information of associated nodes
         if entity.related_nodes:
             related_info = []
@@ -277,27 +347,33 @@ class OasisProfileGenerator:
                 node_name = node.get("name", "")
                 node_labels = node.get("labels", [])
                 node_summary = node.get("summary", "")
-                
-                type_label = next((l for l in node_labels if l not in ("Entity", "Node")), "Unknown")
-                
+
+                type_label = next(
+                    (label for label in node_labels if label not in ("Entity", "Node")), "Unknown"
+                )
+
                 info = f"- {node_name} ({type_label})"
                 if node_summary:
                     info += f": {node_summary}"
                 related_info.append(info)
-            
+
             if related_info:
-                context_parts.append("### Related Entity Profiles\n" + "\n".join(related_info))
-                
+                context_parts.append(
+                    "### Related Entity Profiles\n" + "\n".join(related_info)
+                )
+
         return "\n\n".join(context_parts)
 
-    def _generate_persona_with_llm(self, name: str, entity_type: str, context: str) -> Dict[str, Any]:
+    def _generate_persona_with_llm(
+        self, name: str, entity_type: str, context: str
+    ) -> Dict[str, Any]:
         """Generates detailed agent persona using LLM"""
-        
+
         # Distinguish between individual and group entity types
-        is_individual = entity_type.lower() in self.INDIVIDUAL_ENTITY_TYPES
-        
+        entity_type.lower() in self.INDIVIDUAL_ENTITY_TYPES
+
         system_prompt = "You are an expert in social psychology and character design. Your task is to design a highly detailed social media agent persona based on knowledge graph information."
-        
+
         user_prompt = f"""
 Based on the following knowledge graph entity information, design a social media agent persona.
 
@@ -315,14 +391,18 @@ Requirements:
 4. Output in JSON format.
 
 JSON schema:
-{{
+{
   "name": "Full name",
+  "user_name": "social_media_handle (only letters, numbers, and underscores)",
+  "bio": "Short bio (max 160 chars)",
   "persona": "Detailed persona description (at least 300 words)",
   "mbti": "MBTI personality type (e.g., INTJ, ENFP)",
   "country": "Primary country of residence",
   "profession": "Specific profession or role",
+  "age": 25,
+  "gender": "male/female/other",
   "interested_topics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5"]
-}}
+}
 """
 
         try:
@@ -330,12 +410,12 @@ JSON schema:
                 model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.8
+                temperature=0.8,
             )
-            
+
             result = json.loads(response.choices[0].message.content)
             logger.info(f"LLM persona generation complete: {name}")
             return result
@@ -343,17 +423,72 @@ JSON schema:
             logger.error(f"LLM persona generation failed ({name}): {e}")
             return {}
 
-    def _generate_fallback_profile(self, entity: EntityNode, user_id: int) -> OasisAgentProfile:
+    def _generate_fallback_profile(
+        self, entity: EntityNode, user_id: int
+    ) -> OasisAgentProfile:
         """Generates a basic profile without LLM"""
         source_type = entity.get_entity_type() or "Person"
         return OasisAgentProfile(
             user_id=user_id,
+            user_name=f"user_{user_id}",
             name=entity.name,
+            bio=f"A {source_type} profile for {entity.name}.",
             persona=f"A {source_type} named {entity.name} with interest in {', '.join(entity.labels)}.",
             mbti=random.choice(self.MBTI_TYPES),
             country=random.choice(self.COUNTRIES),
             profession=source_type,
             interested_topics=entity.labels[:5],
             source_entity_uuid=entity.uuid,
-            source_entity_type=source_type
+            source_entity_type=source_type,
+            karma=random.randint(100, 5000),
+            friend_count=random.randint(50, 1000),
+            follower_count=random.randint(10, 5000),
+            statuses_count=random.randint(50, 1000),
+            age=random.randint(18, 65),
+            gender=random.choice(["male", "female"]),
         )
+
+    def _save_twitter_csv(self, profiles: List[OasisAgentProfile], file_path: str):
+        """Saves profiles in Twitter CSV format"""
+        import csv
+
+        headers = [
+            "user_id",
+            "user_name",
+            "name",
+            "bio",
+            "friend_count",
+            "follower_count",
+            "statuses_count",
+            "created_at",
+        ]
+        with open(file_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            writer.writeheader()
+            for p in profiles:
+                data = p.to_dict()
+                row = {h: data.get(h, "") for h in headers}
+                writer.writerow(row)
+
+    def _save_reddit_json(self, profiles: List[OasisAgentProfile], file_path: str):
+        """Saves profiles in detailed Reddit JSON format"""
+        reddit_profiles = []
+        for p in profiles:
+            data = p.to_dict()
+            reddit_profiles.append(
+                {
+                    "realname": data["name"],
+                    "username": data["user_name"],
+                    "bio": data["bio"],
+                    "persona": data["persona"],
+                    "age": data["age"],
+                    "gender": data["gender"],
+                    "mbti": data["mbti"],
+                    "country": data["country"],
+                    "profession": data["profession"],
+                    "interested_topics": data["interested_topics"],
+                }
+            )
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(reddit_profiles, f, ensure_ascii=False, indent=4)

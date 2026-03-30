@@ -41,11 +41,11 @@ def test_search_graph_returns_facts(mock_graphiti):
     from app.services.graph_tools import GraphToolsService
 
     edge = _make_edge("e1", "Alice knows Bob")
-    mock_graphiti.search = AsyncMock(
-        return_value=MagicMock(edges=[edge], nodes=[])
-    )
+    mock_graphiti.search = AsyncMock(return_value=MagicMock(edges=[edge], nodes=[]))
 
-    with patch("app.services.graph_tools.create_graphiti_client", return_value=mock_graphiti):
+    with patch(
+        "app.services.graph_tools.create_graphiti_client", return_value=mock_graphiti
+    ):
         svc = GraphToolsService()
         result = svc.search_graph("group-1", "Alice")
 
@@ -64,9 +64,17 @@ def test_get_graph_statistics_counts_entity_types(mock_graphiti):
     ]
     edges = [_make_edge("e1", "fact")]
 
-    with patch("app.services.graph_tools.fetch_all_nodes", new=AsyncMock(return_value=nodes)):
-        with patch("app.services.graph_tools.fetch_all_edges", new=AsyncMock(return_value=edges)):
-            with patch("app.services.graph_tools.create_graphiti_client", return_value=mock_graphiti):
+    with patch(
+        "app.services.graph_tools.fetch_all_nodes", new=AsyncMock(return_value=nodes)
+    ):
+        with patch(
+            "app.services.graph_tools.fetch_all_edges",
+            new=AsyncMock(return_value=edges),
+        ):
+            with patch(
+                "app.services.graph_tools.create_graphiti_client",
+                return_value=mock_graphiti,
+            ):
                 svc = GraphToolsService()
                 stats = svc.get_graph_statistics("group-1")
 
@@ -79,7 +87,9 @@ def test_quick_search_delegates_to_search_graph(mock_graphiti):
     """quick_search calls search_graph and returns same result."""
     from app.services.graph_tools import GraphToolsService
 
-    with patch("app.services.graph_tools.create_graphiti_client", return_value=mock_graphiti):
+    with patch(
+        "app.services.graph_tools.create_graphiti_client", return_value=mock_graphiti
+    ):
         svc = GraphToolsService()
         with patch.object(svc, "search_graph") as mock_search:
             mock_search.return_value = MagicMock(total_count=3)

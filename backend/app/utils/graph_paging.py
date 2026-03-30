@@ -12,7 +12,7 @@ from graphiti_core import Graphiti
 
 from .logger import get_logger
 
-logger = get_logger('mirofish.graph_paging')
+logger = get_logger("mirofish.graph_paging")
 
 _DEFAULT_PAGE_SIZE = 100
 _MAX_NODES = 2000
@@ -60,12 +60,16 @@ async def fetch_all_nodes(
         if len(batch) < page_size:
             break
 
-        cursor = getattr(batch[-1], 'uuid', None)
+        cursor = getattr(batch[-1], "uuid", None)
         if cursor is None:
-            logger.warning(f"Node missing uuid field, stopping pagination at {len(all_nodes)} nodes")
+            logger.warning(
+                f"Node missing uuid field, stopping pagination at {len(all_nodes)} nodes"
+            )
             break
 
-    logger.debug(f"fetch_all_nodes: {len(all_nodes)} nodes retrieved for group {group_id}")
+    logger.debug(
+        f"fetch_all_nodes: {len(all_nodes)} nodes retrieved for group {group_id}"
+    )
     return all_nodes
 
 
@@ -102,10 +106,14 @@ async def fetch_all_edges(
         if len(batch) < page_size:
             break
 
-        cursor = getattr(batch[-1], 'uuid', None)
+        cursor = getattr(batch[-1], "uuid", None)
         if cursor is None:
-            logger.warning(f"Edge missing uuid field, stopping pagination at {len(all_edges)} edges")
+            logger.warning(
+                f"Edge missing uuid field, stopping pagination at {len(all_edges)} edges"
+            )
             break
 
-    logger.debug(f"fetch_all_edges: {len(all_edges)} edges retrieved for group {group_id}")
+    logger.debug(
+        f"fetch_all_edges: {len(all_edges)} edges retrieved for group {group_id}"
+    )
     return all_edges

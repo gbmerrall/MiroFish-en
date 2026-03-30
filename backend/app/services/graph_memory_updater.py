@@ -20,12 +20,13 @@ from graphiti_core.nodes import EpisodeType
 from ..utils.graphiti_client import create_graphiti_client
 from ..utils.logger import get_logger
 
-logger = get_logger('mirofish.graph_memory_updater')
+logger = get_logger("mirofish.graph_memory_updater")
 
 
 @dataclass
 class AgentActivity:
     """Agent activity record. Produces natural-language episode text for Graphiti."""
+
     platform: str
     agent_id: int
     agent_name: str
@@ -93,7 +94,9 @@ class AgentActivity:
     def _describe_quote_post(self) -> str:
         content = self.action_args.get("original_content", "")
         author = self.action_args.get("original_author_name", "")
-        quote = self.action_args.get("quote_content", "") or self.action_args.get("content", "")
+        quote = self.action_args.get("quote_content", "") or self.action_args.get(
+            "content", ""
+        )
         if content and author:
             base = f'quoted {author}\'s post "{content}"'
         elif content:
@@ -114,7 +117,9 @@ class AgentActivity:
         post_author = self.action_args.get("post_author_name", "")
         if content:
             if post_content and post_author:
-                return f'commented on {post_author}\'s post "{post_content}": "{content}"'
+                return (
+                    f'commented on {post_author}\'s post "{post_content}": "{content}"'
+                )
             elif post_content:
                 return f'commented on the post "{post_content}": "{content}"'
             elif post_author:
@@ -190,7 +195,8 @@ class GraphMemoryUpdater:
 
         self._activity_queue: Queue = Queue()
         self._platform_buffers: dict[str, list[AgentActivity]] = {
-            "twitter": [], "reddit": []
+            "twitter": [],
+            "reddit": [],
         }
         self._buffer_lock = threading.Lock()
         self._running = False
@@ -272,8 +278,10 @@ class GraphMemoryUpdater:
                             self._platform_buffers[platform] = []
                         self._platform_buffers[platform].append(activity)
                         if len(self._platform_buffers[platform]) >= self.BATCH_SIZE:
-                            batch = self._platform_buffers[platform][:self.BATCH_SIZE]
-                            self._platform_buffers[platform] = self._platform_buffers[platform][self.BATCH_SIZE:]
+                            batch = self._platform_buffers[platform][: self.BATCH_SIZE]
+                            self._platform_buffers[platform] = self._platform_buffers[
+                                platform
+                            ][self.BATCH_SIZE :]
                             self._send_batch(batch, platform)
                             time.sleep(self.SEND_INTERVAL)
                 except Empty:
@@ -301,10 +309,12 @@ class GraphMemoryUpdater:
                 return
             except Exception as e:
                 if attempt < self.MAX_RETRIES - 1:
-                    logger.warning(f"Batch send attempt {attempt+1} failed: {e}")
+                    logger.warning(f"Batch send attempt {attempt + 1} failed: {e}")
                     time.sleep(self.RETRY_DELAY * (attempt + 1))
                 else:
-                    logger.error(f"Batch send failed after {self.MAX_RETRIES} retries: {e}")
+                    logger.error(
+                        f"Batch send failed after {self.MAX_RETRIES} retries: {e}"
+                    )
                     self._failed_count += 1
 
     async def _async_add_episode(self, text: str, platform: str):
@@ -335,7 +345,9 @@ class GraphMemoryUpdater:
         with self._buffer_lock:
             for platform, buffer in self._platform_buffers.items():
                 if buffer:
-                    logger.info(f"Flushing {len(buffer)} remaining {platform} activities")
+                    logger.info(
+                        f"Flushing {len(buffer)} remaining {platform} activities"
+                    )
                     self._send_batch(buffer, platform)
             for platform in self._platform_buffers:
                 self._platform_buffers[platform] = []
@@ -373,7 +385,9 @@ class GraphMemoryManager:
             updater = GraphMemoryUpdater(group_id)
             updater.start()
             cls._updaters[simulation_id] = updater
-            logger.info(f"Created GraphMemoryUpdater: simulation_id={simulation_id}, group_id={group_id}")
+            logger.info(
+                f"Created GraphMemoryUpdater: simulation_id={simulation_id}, group_id={group_id}"
+            )
             return updater
 
     @classmethod
@@ -386,7 +400,9 @@ class GraphMemoryManager:
             if simulation_id in cls._updaters:
                 cls._updaters[simulation_id].stop()
                 del cls._updaters[simulation_id]
-                logger.info(f"Stopped GraphMemoryUpdater: simulation_id={simulation_id}")
+                logger.info(
+                    f"Stopped GraphMemoryUpdater: simulation_id={simulation_id}"
+                )
 
     @classmethod
     def stop_all(cls):

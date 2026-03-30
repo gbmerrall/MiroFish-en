@@ -13,12 +13,13 @@ from ..utils.graphiti_client import create_graphiti_client
 from ..utils.graph_paging import fetch_all_nodes, fetch_all_edges
 from ..utils.logger import get_logger
 
-logger = get_logger('mirofish.graph_entity_reader')
+logger = get_logger("mirofish.graph_entity_reader")
 
 
 @dataclass
 class EntityNode:
     """Entity node data structure."""
+
     uuid: str
     name: str
     labels: list[str]
@@ -49,6 +50,7 @@ class EntityNode:
 @dataclass
 class FilteredEntities:
     """Filtered entity set result."""
+
     entities: list[EntityNode]
     entity_types: set[str]
     total_count: int
@@ -137,7 +139,9 @@ class GraphEntityReader:
         If defined_entity_types is provided, only those types are kept.
         """
         return asyncio.run(
-            self._async_filter_entities(group_id, defined_entity_types, enrich_with_edges)
+            self._async_filter_entities(
+                group_id, defined_entity_types, enrich_with_edges
+            )
         )
 
     async def _async_filter_entities(
@@ -149,7 +153,9 @@ class GraphEntityReader:
         graphiti = create_graphiti_client()
         try:
             raw_nodes = await fetch_all_nodes(graphiti, group_id)
-            raw_edges = await fetch_all_edges(graphiti, group_id) if enrich_with_edges else []
+            raw_edges = (
+                await fetch_all_edges(graphiti, group_id) if enrich_with_edges else []
+            )
         finally:
             await graphiti.close()
 
@@ -181,12 +187,12 @@ class GraphEntityReader:
         entity_types_found: set[str] = set()
 
         for node in all_nodes:
-            custom_labels = [l for l in node["labels"] if l not in ("Entity", "Node")]
+            custom_labels = [label for label in node["labels"] if label not in ("Entity", "Node")]
             if not custom_labels:
                 continue
 
             if defined_entity_types:
-                matching = [l for l in custom_labels if l in defined_entity_types]
+                matching = [label for label in custom_labels if label in defined_entity_types]
                 if not matching:
                     continue
                 entity_type = matching[0]
@@ -209,20 +215,24 @@ class GraphEntityReader:
 
                 for edge in all_edges:
                     if edge["source_node_uuid"] == node["uuid"]:
-                        related_edges.append({
-                            "direction": "outgoing",
-                            "edge_name": edge["name"],
-                            "fact": edge["fact"],
-                            "target_node_uuid": edge["target_node_uuid"],
-                        })
+                        related_edges.append(
+                            {
+                                "direction": "outgoing",
+                                "edge_name": edge["name"],
+                                "fact": edge["fact"],
+                                "target_node_uuid": edge["target_node_uuid"],
+                            }
+                        )
                         related_node_uuids.add(edge["target_node_uuid"])
                     elif edge["target_node_uuid"] == node["uuid"]:
-                        related_edges.append({
-                            "direction": "incoming",
-                            "edge_name": edge["name"],
-                            "fact": edge["fact"],
-                            "source_node_uuid": edge["source_node_uuid"],
-                        })
+                        related_edges.append(
+                            {
+                                "direction": "incoming",
+                                "edge_name": edge["name"],
+                                "fact": edge["fact"],
+                                "source_node_uuid": edge["source_node_uuid"],
+                            }
+                        )
                         related_node_uuids.add(edge["source_node_uuid"])
 
                 entity.related_edges = related_edges
@@ -268,7 +278,9 @@ class GraphEntityReader:
     ) -> list[EntityNode]:
         """Returns all entities of the specified type."""
         result = self.filter_defined_entities(
-            group_id, defined_entity_types=[entity_type], enrich_with_edges=enrich_with_edges
+            group_id,
+            defined_entity_types=[entity_type],
+            enrich_with_edges=enrich_with_edges,
         )
         return result.entities
 

@@ -14,7 +14,7 @@ from graphiti_core.llm_client.openai_client import OpenAIClient, LLMConfig
 from ..config import Config
 from .logger import get_logger
 
-logger = get_logger('mirofish.graphiti_client')
+logger = get_logger("mirofish.graphiti_client")
 
 
 def create_graphiti_client() -> Graphiti:

@@ -39,13 +39,24 @@ def test_filter_defined_entities_keeps_typed_nodes():
     reader = GraphEntityReader.__new__(GraphEntityReader)
 
     with patch("app.services.graph_entity_reader.asyncio") as mock_asyncio:
-        mock_asyncio.run.side_effect = lambda coro: asyncio.get_event_loop().run_until_complete(coro)
+        mock_asyncio.run.side_effect = lambda coro: (
+            asyncio.get_event_loop().run_until_complete(coro)
+        )
 
-        with patch("app.services.graph_entity_reader.fetch_all_nodes", new=AsyncMock(return_value=nodes)):
-            with patch("app.services.graph_entity_reader.fetch_all_edges", new=AsyncMock(return_value=edges)):
+        with patch(
+            "app.services.graph_entity_reader.fetch_all_nodes",
+            new=AsyncMock(return_value=nodes),
+        ):
+            with patch(
+                "app.services.graph_entity_reader.fetch_all_edges",
+                new=AsyncMock(return_value=edges),
+            ):
                 mock_graphiti = MagicMock()
                 mock_graphiti.close = AsyncMock()
-                with patch("app.services.graph_entity_reader.create_graphiti_client", return_value=mock_graphiti):
+                with patch(
+                    "app.services.graph_entity_reader.create_graphiti_client",
+                    return_value=mock_graphiti,
+                ):
                     result = reader.filter_defined_entities("group-1")
 
     assert result.filtered_count == 2
@@ -63,10 +74,16 @@ def test_get_all_nodes_returns_dicts():
 
     reader = GraphEntityReader.__new__(GraphEntityReader)
 
-    with patch("app.services.graph_entity_reader.fetch_all_nodes", new=AsyncMock(return_value=nodes)):
+    with patch(
+        "app.services.graph_entity_reader.fetch_all_nodes",
+        new=AsyncMock(return_value=nodes),
+    ):
         mock_graphiti = MagicMock()
         mock_graphiti.close = AsyncMock()
-        with patch("app.services.graph_entity_reader.create_graphiti_client", return_value=mock_graphiti):
+        with patch(
+            "app.services.graph_entity_reader.create_graphiti_client",
+            return_value=mock_graphiti,
+        ):
             result = reader.get_all_nodes("group-1")
 
     assert len(result) == 1

@@ -20,12 +20,13 @@ from ..utils.graph_paging import fetch_all_nodes, fetch_all_edges
 from ..utils.logger import get_logger
 from .text_processor import TextProcessor
 
-logger = get_logger('mirofish.graph_builder')
+logger = get_logger("mirofish.graph_builder")
 
 
 @dataclass
 class GraphInfo:
     """Graph Information Summary"""
+
     graph_id: str
     node_count: int
     edge_count: int
@@ -60,7 +61,7 @@ class GraphBuilderService:
         graph_name: str = "MiroFish Graph",
         chunk_size: int = 500,
         chunk_overlap: int = 50,
-        batch_size: int = 5
+        batch_size: int = 5,
     ) -> str:
         """
         Builds a graph asynchronously in a background thread.
@@ -82,12 +83,20 @@ class GraphBuilderService:
                 "graph_name": graph_name,
                 "chunk_size": chunk_size,
                 "text_length": len(text),
-            }
+            },
         )
 
         thread = threading.Thread(
             target=self._build_graph_worker,
-            args=(task_id, text, ontology, graph_name, chunk_size, chunk_overlap, batch_size)
+            args=(
+                task_id,
+                text,
+                ontology,
+                graph_name,
+                chunk_size,
+                chunk_overlap,
+                batch_size,
+            ),
         )
         thread.daemon = True
         thread.start()
@@ -102,7 +111,7 @@ class GraphBuilderService:
         graph_name: str,
         chunk_size: int,
         chunk_overlap: int,
-        batch_size: int
+        batch_size: int,
     ):
         """Worker thread for graph construction."""
         try:
@@ -110,34 +119,32 @@ class GraphBuilderService:
                 task_id,
                 status=TaskStatus.PROCESSING,
                 progress=5,
-                message="Initializing Graphiti construction..."
+                message="Initializing Graphiti construction...",
             )
 
             # 1. Unique namespace for this graph (maps to Graphiti group_id)
             group_id = f"mf_{uuid.uuid4().hex[:12]}"
-            
+
             # 2. Split text into chunks
             chunks = TextProcessor.split_text(text, chunk_size, chunk_overlap)
             total_chunks = len(chunks)
             self.task_manager.update_task(
-                task_id,
-                progress=15,
-                message=f"Text split into {total_chunks} chunks"
+                task_id, progress=15, message=f"Text split into {total_chunks} chunks"
             )
 
             # 3. Process batches
             # Graphiti processes episodes sequentially per group to maintain temporal order.
             # We add episodes one by one or in small batches.
             for i in range(0, total_chunks, batch_size):
-                batch = chunks[i:i + batch_size]
+                batch = chunks[i : i + batch_size]
                 batch_idx = (i // batch_size) + 1
                 total_batches = (total_chunks + batch_size - 1) // batch_size
-                
+
                 progress_val = 15 + int((batch_idx / total_batches) * 70)
                 self.task_manager.update_task(
                     task_id,
                     progress=progress_val,
-                    message=f"Processing batch {batch_idx}/{total_batches}..."
+                    message=f"Processing batch {batch_idx}/{total_batches}...",
                 )
 
                 for chunk_text in batch:
@@ -145,20 +152,23 @@ class GraphBuilderService:
 
             # 4. Finalize and get stats
             self.task_manager.update_task(
-                task_id,
-                progress=90,
-                message="Retrieving graph statistics..."
+                task_id, progress=90, message="Retrieving graph statistics..."
             )
 
             graph_info = self._get_graph_info_sync(group_id)
 
-            self.task_manager.complete_task(task_id, {
-                "graph_id": group_id,
-                "graph_info": graph_info.to_dict(),
-                "chunks_processed": total_chunks,
-            })
+            self.task_manager.complete_task(
+                task_id,
+                {
+                    "graph_id": group_id,
+                    "graph_info": graph_info.to_dict(),
+                    "chunks_processed": total_chunks,
+                },
+            )
 
-            logger.info(f"Graph build complete: group_id={group_id}, nodes={graph_info.node_count}")
+            logger.info(
+                f"Graph build complete: group_id={group_id}, nodes={graph_info.node_count}"
+            )
 
         except Exception as e:
             logger.error(f"Graph build failed: {e}", exc_info=True)
@@ -187,10 +197,10 @@ class GraphBuilderService:
         try:
             nodes = await fetch_all_nodes(graphiti, group_id)
             edges = await fetch_all_edges(graphiti, group_id)
-            
+
             entity_types = set()
             for node in nodes:
-                for label in (node.labels or []):
+                for label in node.labels or []:
                     if label not in ("Entity", "Node"):
                         entity_types.add(label)
 
@@ -198,7 +208,7 @@ class GraphBuilderService:
                 graph_id=group_id,
                 node_count=len(nodes),
                 edge_count=len(edges),
-                entity_types=list(entity_types)
+                entity_types=list(entity_types),
             )
         finally:
             await graphiti.close()
@@ -214,7 +224,7 @@ class GraphBuilderService:
             edges = await fetch_all_edges(graphiti, graph_id)
 
             node_map = {n.uuid: n.name or "" for n in nodes}
-            
+
             nodes_data = [
                 {
                     "uuid": n.uuid,
@@ -251,8 +261,10 @@ class GraphBuilderService:
             await graphiti.close()
 
     def delete_graph(self, graph_id: str):
-        """Note: Graphiti does not have a single-call 'delete group' yet. 
+        """Note: Graphiti does not have a single-call 'delete group' yet.
         In FalkorDB we would have to delete all nodes/edges for this group_id.
         For now, this is a no-op to satisfy the interface.
         """
-        logger.warning(f"delete_graph called for {graph_id} - not yet implemented for Graphiti backend")
+        logger.warning(
+            f"delete_graph called for {graph_id} - not yet implemented for Graphiti backend"
+        )
