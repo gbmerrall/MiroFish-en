@@ -3,7 +3,6 @@ Ontology Generation Service
 Interface 1: Analyzes text content to generate entity and relationship type definitions suitable for social simulation.
 """
 
-import json
 from typing import Dict, Any, List, Optional
 from ..utils.llm_client import LLMClient
 
@@ -382,8 +381,8 @@ Please design entity types and relationship types suitable for social media publ
                     attr_desc = attr.get("description", attr_name)
                     code_lines.append(f'    {attr_name}: EntityText = Field(')
                     code_lines.append(f'        description="{attr_desc}",')
-                    code_lines.append(f'        default=None')
-                    code_lines.append(f'    )')
+                    code_lines.append('        default=None')
+                    code_lines.append('    )')
             else:
                 code_lines.append('    pass')
             
@@ -410,8 +409,8 @@ Please design entity types and relationship types suitable for social media publ
                     attr_desc = attr.get("description", attr_name)
                     code_lines.append(f'    {attr_name}: EntityText = Field(')
                     code_lines.append(f'        description="{attr_desc}",')
-                    code_lines.append(f'        default=None')
-                    code_lines.append(f'    )')
+                    code_lines.append('        default=None')
+                    code_lines.append('    )')
             else:
                 code_lines.append('    pass')
             

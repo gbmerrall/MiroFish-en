@@ -8,7 +8,6 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from graphiti_core import Graphiti
 
 from ..utils.graphiti_client import create_graphiti_client
 from ..utils.graph_paging import fetch_all_nodes, fetch_all_edges

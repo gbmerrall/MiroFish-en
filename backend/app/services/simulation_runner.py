@@ -7,21 +7,19 @@ import os
 import sys
 import json
 import time
-import asyncio
 import threading
 import subprocess
 import signal
 import atexit
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from queue import Queue
 
-from ..config import Config
 from ..utils.logger import get_logger
 from .graph_memory_updater import ZepGraphMemoryManager
-from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
+from .simulation_ipc import SimulationIPCClient
 
 logger = get_logger('mirofish.simulation_runner')
 
@@ -340,13 +338,13 @@ class SimulationRunner:
         config_path = os.path.join(sim_dir, "simulation_config.json")
         
         if not os.path.exists(config_path):
-            raise ValueError(f"Simulation configuration does not exist, please call /prepare interface first")
+            raise ValueError("Simulation configuration does not exist, please call /prepare interface first")
         
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
         # Initialize run state
-        time_config = config.get("time_config", {}
+        time_config = config.get("time_config", {})
         total_hours = time_config.get("total_simulation_hours", 72)
         minutes_per_round = time_config.get("minutes_per_round", 30)
         total_rounds = int(total_hours * 60 / minutes_per_round)
@@ -1017,7 +1015,7 @@ class SimulationRunner:
                     "twitter_actions": 0,
                     "reddit_actions": 0,
                     "active_agents": set(),
-                    "action_types": {}
+                    "action_types": {},
                     "first_action_time": action.timestamp,
                     "last_action_time": action.timestamp,
                 }
@@ -1073,7 +1071,7 @@ class SimulationRunner:
                     "total_actions": 0,
                     "twitter_actions": 0,
                     "reddit_actions": 0,
-                    "action_types": {}
+                    "action_types": {},
                     "first_action_time": action.timestamp,
                     "last_action_time": action.timestamp,
                 }
@@ -1117,7 +1115,6 @@ class SimulationRunner:
         Returns:
             Cleanup result information
         """
-        import shutil
         
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         

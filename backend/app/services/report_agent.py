@@ -94,8 +94,7 @@ class ReportLogger:
         
         # Append to JSONL file
         with open(self.log_file_path, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + '
-')
+            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
     
     def log_start(self, simulation_id: str, graph_id: str, simulation_requirement: str):
         """Records the start of report generation"""
@@ -409,13 +408,9 @@ class ReportSection:
 
     def to_markdown(self, level: int = 2) -> str:
         """Converts to Markdown format"""
-        md = f"{'#' * level} {self.title}
-
-"
+        md = f"{'#' * level} {self.title}\n\n"
         if self.content:
-            md += f"{self.content}
-
-"
+            md += f"{self.content}\n\n"
         return md
 
 
@@ -435,12 +430,8 @@ class ReportOutline:
     
     def to_markdown(self) -> str:
         """Converts to Markdown format"""
-        md = f"# {self.title}
-
-"
-        md += f"> {self.summary}
-
-"
+        md = f"# {self.title}\n\n"
+        md += f"> {self.summary}\n\n"
         for section in self.sections:
             md += section.to_markdown()
         return md
@@ -827,8 +818,7 @@ REACT_TOOL_LIMIT_MSG = (
     'Please immediately output the section content based on the information already obtained, starting with "Final Answer:".'
 )
 
-REACT_UNUSED_TOOLS_HINT = "
-💡 You haven't used: {unused_list} yet, it is recommended to try different tools to get information from multiple perspectives"
+REACT_UNUSED_TOOLS_HINT = "💡 You haven't used: {unused_list} yet, it is recommended to try different tools to get information from multiple perspectives"
 
 REACT_FORCE_FINAL_MSG = "The tool call limit has been reached, please directly output Final Answer: and generate the section content."
 
@@ -862,9 +852,7 @@ Prediction condition: {simulation_requirement}
 - Use > format to quote key content
 - Give the conclusion first, then explain the reason"""
 
-CHAT_OBSERVATION_SUFFIX = "
-
-Please answer the question concisely."
+CHAT_OBSERVATION_SUFFIX = "\n\nPlease answer the question concisely."
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1142,8 +1130,7 @@ class ReportAgent:
             desc_parts.append(f"- {name}: {tool['description']}")
             if params_desc:
                 desc_parts.append(f"  Parameters: {params_desc}")
-        return "
-".join(desc_parts)
+        return "\n".join(desc_parts)
     
     def plan_outline(
         self, 
@@ -1278,11 +1265,7 @@ class ReportAgent:
                 # Each section up to 4000 characters
                 truncated = sec[:4000] + "..." if len(sec) > 4000 else sec
                 previous_parts.append(truncated)
-            previous_content = "
-
----
-
-".join(previous_parts)
+            previous_content = "\n\n---\n\n".join(previous_parts)
         else:
             previous_content = "(This is the first section)"
         
@@ -1305,8 +1288,7 @@ class ReportAgent:
         all_tools = {"insight_forge", "panorama_search", "quick_search", "interview_agents"}
 
         # Report context, for sub-question generation in InsightForge
-        report_context = f"Section title: {section.title}
-Simulation requirement: {self.simulation_requirement}"
+        report_context = f"Section title: {section.title}\nSimulation requirement: {self.simulation_requirement}"
         
         for iteration in range(max_iterations):
             if progress_callback:
@@ -1355,14 +1337,10 @@ Simulation requirement: {self.simulation_requirement}"
                     messages.append({
                         "role": "user",
                         "content": (
-                            "[Format error] You included both a tool call and a Final Answer in one reply, which is not allowed.
-"
-                            "In each reply, you can only do one of the following two things:
-"
-                            "- Call a tool (output a <tool_call> block, do not write Final Answer)
-"
-                            "- Output the final content (start with 'Final Answer:', do not include <tool_call>)
-"
+                            "[Format error] You included both a tool call and a Final Answer in one reply, which is not allowed.\n"
+                            "In each reply, you can only do one of the following two things:\n"
+                            "- Call a tool (output a <tool_call> block, do not write Final Answer)\n"
+                            "- Output the final content (start with 'Final Answer:', do not include <tool_call>)\n"
                             "Please reply again, doing only one of these."
                         ),
                     })
@@ -1688,18 +1666,14 @@ Simulation requirement: {self.simulation_requirement}"
                 )
                 
                 section.content = section_content
-                generated_sections.append(f"## {section.title}
-
-{section_content}")
+                generated_sections.append(f"## {section.title}\n\n{section_content}")
 
                 # Save section
                 ReportManager.save_section(report_id, section_num, section)
                 completed_section_titles.append(section.title)
 
                 # Log section completion
-                full_section_content = f"## {section.title}
-
-{section_content}"
+                full_section_content = f"## {section.title}\n\n{section_content}"
 
                 if self.report_logger:
                     self.report_logger.log_section_full_complete(
@@ -1821,9 +1795,7 @@ Simulation requirement: {self.simulation_requirement}"
                 # Limit report length to avoid excessive context
                 report_content = report.markdown_content[:15000]
                 if len(report.markdown_content) > 15000:
-                    report_content += "
-
-... [Report content truncated] ..."
+                    report_content += "\n\n... [Report content truncated] ..."
         except Exception as e:
             logger.warning(f"Failed to get report content: {e}")
         
@@ -1884,10 +1856,7 @@ Simulation requirement: {self.simulation_requirement}"
             
             # Add results to messages
             messages.append({"role": "assistant", "content": response})
-            observation = "
-".n("
-".join([f"[{r['tool']} result]
-{r['result']}" for r in tool_results])))
+            observation = "\n".join([f"[{r['tool']} result]\n{r['result']}" for r in tool_results])
             messages.append({
                 "role": "user",
                 "content": observation + CHAT_OBSERVATION_SUFFIX
@@ -2021,8 +1990,7 @@ class ReportManager:
                 total_lines = i + 1
                 if i >= from_line:
                     # Keep the original log line, remove trailing newline
-                    logs.append(line.rstrip('
-'))
+                    logs.append(line.rstrip('\n'))
         
         return {
             "logs": logs,
@@ -2145,13 +2113,9 @@ class ReportManager:
 
         # Build section Markdown content - clean up potentially duplicate headings
         cleaned_content = cls._clean_section_content(section.content, section.title)
-        md_content = f"## {section.title}
-
-"
+        md_content = f"## {section.title}\n\n"
         if cleaned_content:
-            md_content += f"{cleaned_content}
-
-"
+            md_content += f"{cleaned_content}\n\n"
 
         # Save file
         file_suffix = f"section_{section_index:02d}.md"
@@ -2183,8 +2147,7 @@ class ReportManager:
             return content
         
         content = content.strip()
-        lines = content.split('
-')
+        lines = content.split('\n')
         cleaned_lines = []
         skip_next_empty = False
         
@@ -2229,8 +2192,7 @@ class ReportManager:
             while cleaned_lines and cleaned_lines[0].strip() == '':
                 cleaned_lines.pop(0)
         
-        return '
-'.join(cleaned_lines)
+        return '\n'.join(cleaned_lines)
     
     @classmethod
     def update_progress(
@@ -2313,15 +2275,9 @@ class ReportManager:
         folder = cls._get_report_folder(report_id)
         
         # Build report header
-        md_content = f"# {outline.title}
-
-"
-        md_content += f"> {outline.summary}
-
-"
-        md_content += f"---
-
-"
+        md_content = f"# {outline.title}\n\n"
+        md_content += f"> {outline.summary}\n\n"
+        md_content += f"---\n\n"
         
         # Read all section files in order
         sections = cls.get_generated_sections(report_id)
@@ -2357,8 +2313,7 @@ class ReportManager:
         """
         import re
         
-        lines = content.split('
-')
+        lines = content.split('\n')
         processed_lines = []
         prev_was_heading = False
         
@@ -2464,8 +2419,7 @@ class ReportManager:
                 empty_count = 0
                 result_lines.append(line)
         
-        return '
-'.join(result_lines)
+        return '\n'.join(result_lines)
     
     @classmethod
     def save_report(cls, report: Report) -> None:

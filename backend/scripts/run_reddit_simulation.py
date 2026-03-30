@@ -104,7 +104,7 @@ def setup_oasis_logging(log_dir: str):
         "table": os.path.join(log_dir, "table.log"),
     }
     
-    for logger_name in loggers_config.items():
+    for logger_name, log_file in loggers_config.items():
         logger = logging.getLogger(logger_name)
         logger.setLevel(logging.DEBUG)
         logger.handlers.clear()
@@ -355,8 +355,7 @@ class IPCHandler:
         command_type = command.get("command_type")
         args = command.get("args", {})
         
-        print(f"
-Received IPC command: {command_type}, id={command_id}")
+        print(f"\nReceived IPC command: {command_type}, id={command_id}")
         
         if command_type == CommandType.INTERVIEW:
             await self.handle_interview(
@@ -545,11 +544,9 @@ class RedditSimulationRunner:
             original_rounds = total_rounds
             total_rounds = min(total_rounds, max_rounds)
             if total_rounds < original_rounds:
-                print(f"
-Rounds have been truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
+                print(f"\nRounds have been truncated: {original_rounds} -> {total_rounds} (max_rounds={max_rounds})")
         
-        print(f"
-Simulation parameters:")
+        print(f"\nSimulation parameters:")
         print(f"  - Total simulation duration: {total_hours} hours")
         print(f"  - Time per round: {minutes_per_round} minutes")
         print(f"  - Total rounds: {total_rounds}")
@@ -557,8 +554,7 @@ Simulation parameters:")
             print(f"  - Maximum rounds limit: {max_rounds}")
         print(f"  - Number of Agents: {len(self.config.get('agent_configs', []))}")
         
-        print("
-Initializing LLM model...")
+        print("\nInitializing LLM model...")
         model = self._create_model()
         
         print("Loading Agent Profile...")
@@ -587,8 +583,7 @@ Initializing LLM model...")
         )
         
         await self.env.reset()
-        print("Environment initialized
-")
+        print("Environment initialized\n")
         
         # Initialize IPC handler
         self.ipc_handler = IPCHandler(self.simulation_dir, self.env, self.agent_graph)
@@ -626,8 +621,7 @@ Initializing LLM model...")
                 print(f"  Published {len(initial_actions)} initial posts")
         
         # Main simulation loop
-        print("
-Starting simulation loop...")
+        print("\nStarting simulation loop...")
         start_time = datetime.now()
         
         for round_num in range(total_rounds):
@@ -658,15 +652,13 @@ Starting simulation loop...")
                       f"- elapsed: {elapsed:.1f}s")
         
         total_elapsed = (datetime.now() - start_time).total_seconds()
-        print(f"
-Simulation loop complete!")
+        print(f"\nSimulation loop complete!")
         print(f"  - Total time: {total_elapsed:.1f}s")
         print(f"  - Database: {db_path}")
         
         # Whether to enter command-waiting mode
         if self.wait_for_commands:
-            print("
-" + "=" * 60)
+            print("\n" + "=" * 60)
             print("Entering command-waiting mode - environment remains running")
             print("Supported commands: interview, batch_interview, close_env")
             print("=" * 60)
@@ -685,17 +677,13 @@ Simulation loop complete!")
                     except asyncio.TimeoutError:
                         pass
             except KeyboardInterrupt:
-                print("
-Interrupt signal received")
+                print("\nInterrupt signal received")
             except asyncio.CancelledError:
-                print("
-Task cancelled")
+                print("\nTask cancelled")
             except Exception as e:
-                print(f"
-Error processing command: {e}")
+                print(f"\nError processing command: {e}")
             
-            print("
-Closing environment...")
+            print("\nClosing environment...")
         
         # Close environment
         self.ipc_handler.update_status("stopped")
@@ -755,8 +743,7 @@ def setup_signal_handlers():
     def signal_handler(signum, frame):
         global _cleanup_done
         sig_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
-        print(f"
-Received {sig_name} signal, exiting...")
+        print(f"\nReceived {sig_name} signal, exiting...")
         if not _cleanup_done:
             _cleanup_done = True
             if _shutdown_event:
@@ -775,8 +762,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("
-Program interrupted")
+        print("\nProgram interrupted")
     except SystemExit:
         pass
     finally:

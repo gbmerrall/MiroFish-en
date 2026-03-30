@@ -277,7 +277,7 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     existing_files = []
     missing_files = []
     for f in required_files:
-            file_path = os.path.join(simulation_dir, f)
+        file_path = os.path.join(simulation_dir, f)
         if os.path.exists(file_path):
             existing_files.append(f)
         else:
@@ -618,8 +618,8 @@ def prepare_simulation():
                 "status": "preparing",
                 "message": "Preparation task started, please query progress via /api/simulation/prepare/status",
                 "already_prepared": False,
-                "expected_entities_count": state.entities_count,  // Expected total number of Agents
-                "entity_types": state.entity_types  // List of entity types
+                "expected_entities_count": state.entities_count,
+                "entity_types": state.entity_types
             }
         })
         

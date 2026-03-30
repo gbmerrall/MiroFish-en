@@ -197,10 +197,7 @@ def generate_ontology():
                 text = FileParser.extract_text(file_info["path"])
                 text = TextProcessor.preprocess_text(text)
                 document_texts.append(text)
-                all_text += f"
-
-=== {file_info['original_filename']} ===
-{text}"
+                all_text += f"\n\n=== {file_info['original_filename']} ===\n{text}"
         
         if not document_texts:
             ProjectManager.delete_project(project.project_id)

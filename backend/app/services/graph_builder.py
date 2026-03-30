@@ -5,17 +5,15 @@ Replaces the Zep-based implementation.
 """
 
 import asyncio
-import os
 import uuid
 import time
 import threading
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List
 from dataclasses import dataclass
 
 from graphiti_core.nodes import EpisodeType
 
-from ..config import Config
 from ..models.task import TaskManager, TaskStatus
 from ..utils.graphiti_client import create_graphiti_client
 from ..utils.graph_paging import fetch_all_nodes, fetch_all_edges

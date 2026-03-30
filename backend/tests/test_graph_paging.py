@@ -1,8 +1,8 @@
 """Tests for graph_paging utilities."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 import pytest
-from graphiti_core.nodes import EntityNode, EpisodicNode
+from graphiti_core.nodes import EntityNode
 from graphiti_core.edges import EntityEdge
 
 

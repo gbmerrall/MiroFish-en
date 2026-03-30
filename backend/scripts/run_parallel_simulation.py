@@ -515,9 +515,9 @@ class ParallelIPCHandler:
             return False
     
     def _get_interview_result(self, agent_id: int, platform: str) -> Dict[str, Any]:
-            """
-            Gets the latest Interview result from the database.
-            """
+        """
+        Gets the latest Interview result from the database.
+        """
         db_path = os.path.join(self.simulation_dir, f"{platform}_simulation.db")
         
         result = {
@@ -574,8 +574,7 @@ class ParallelIPCHandler:
         command_type = command.get("command_type")
         args = command.get("args", {})
         
-        print(f"
-Received IPC command: {command_type}, id={command_id}")
+        print(f"\nReceived IPC command: {command_type}, id={command_id}")
         
         if command_type == CommandType.INTERVIEW:
             await self.handle_interview(
@@ -1632,17 +1631,13 @@ async def main():
                 except asyncio.TimeoutError:
                     pass  # Timeout, continue loop
         except KeyboardInterrupt:
-            print("
-Interrupt signal received")
+            print("\nInterrupt signal received")
         except asyncio.CancelledError:
-            print("
-Task cancelled")
+            print("\nTask cancelled")
         except Exception as e:
-            print(f"
-Error processing command: {e}")
+            print(f"\nError processing command: {e}")
         
-        log_manager.info("
-Closing environment...")
+        log_manager.info("\nClosing environment...")
         ipc_handler.update_status("stopped")
     
     # Close environment
@@ -1676,8 +1671,7 @@ def setup_signal_handlers(loop=None):
     def signal_handler(signum, frame):
         global _cleanup_done
         sig_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
-        print(f"
-Received {sig_name} signal, exiting...")
+        print(f"\nReceived {sig_name} signal, exiting...")
         
         if not _cleanup_done:
             _cleanup_done = True
@@ -1700,8 +1694,7 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("
-Program interrupted")
+        print("\nProgram interrupted")
     except SystemExit:
         pass
     finally:

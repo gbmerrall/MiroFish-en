@@ -17,7 +17,6 @@ from typing import Any, Optional
 
 from graphiti_core.nodes import EpisodeType
 
-from ..config import Config
 from ..utils.graphiti_client import create_graphiti_client
 from ..utils.logger import get_logger
 

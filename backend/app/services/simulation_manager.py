@@ -6,17 +6,15 @@ Uses preset scripts + LLM intelligent generation for configuration parameters
 
 import os
 import json
-import shutil
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from ..config import Config
 from ..utils.logger import get_logger
-from .graph_entity_reader import ZepEntityReader, FilteredEntities
-from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
-from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
+from .graph_entity_reader import ZepEntityReader
+from .oasis_profile_generator import OasisProfileGenerator
+from .simulation_config_generator import SimulationConfigGenerator
 
 logger = get_logger('mirofish.simulation')
 
@@ -522,14 +520,10 @@ class SimulationManager:
                 "parallel": f"python {scripts_dir}/run_parallel_simulation.py --config {config_path}",
             },
             "instructions": (
-                f"1. Activate conda environment: conda activate MiroFish
-"
-                f"2. Run simulation (scripts located in {scripts_dir}):
-"
-                f"   - Run Twitter only: python {scripts_dir}/run_twitter_simulation.py --config {config_path}
-"
-                f"   - Run Reddit only: python {scripts_dir}/run_reddit_simulation.py --config {config_path}
-"
+                f"1. Activate conda environment: conda activate MiroFish\n"
+                f"2. Run simulation (scripts located in {scripts_dir}):\n"
+                f"   - Run Twitter only: python {scripts_dir}/run_twitter_simulation.py --config {config_path}\n"
+                f"   - Run Reddit only: python {scripts_dir}/run_reddit_simulation.py --config {config_path}\n"
                 f"   - Run dual-platform in parallel: python {scripts_dir}/run_parallel_simulation.py --config {config_path}"
             )
         }

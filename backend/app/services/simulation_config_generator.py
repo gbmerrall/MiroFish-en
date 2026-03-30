@@ -313,7 +313,7 @@ class SimulationConfigGenerator:
             
             report_progress(
                 3 + batch_idx,
-                f"Generating Agent configuration ({start_idx + 1}-{end_idx}/{len(entities)})...
+                f"Generating Agent configuration ({start_idx + 1}-{end_idx}/{len(entities)})..."
             )
             
             batch_configs = self._generate_agent_configs_batch(
@@ -390,11 +390,8 @@ class SimulationConfigGenerator:
         
         # Build context
         context_parts = [
-            f"## Simulation Requirement
-{simulation_requirement}",
-            f"
-## Entity Information ({len(entities)} items)
-{entity_summary}",
+            f"## Simulation Requirement\n{simulation_requirement}",
+            f"\n## Entity Information ({len(entities)} items)\n{entity_summary}",
         ]
         
         current_length = sum(len(p) for p in context_parts)
@@ -403,14 +400,10 @@ class SimulationConfigGenerator:
         if remaining_length > 0 and document_text:
             doc_text = document_text[:remaining_length]
             if len(document_text) > remaining_length:
-                doc_text += "
-...(Document truncated)"
-            context_parts.append(f"
-## Original Document Content
-{doc_text}")
+                doc_text += "\n...(Document truncated)"
+            context_parts.append(f"\n## Original Document Content\n{doc_text}")
         
-        return "
-".join(context_parts)
+        return "\n\n".join(context_parts)
     
     def _summarize_entities(self, entities: List[EntityNode]) -> str:
         """Generate entity summary"""
@@ -425,8 +418,7 @@ class SimulationConfigGenerator:
             by_type[t].append(e)
         
         for entity_type, type_entities in by_type.items():
-            lines.append(f"
-### {entity_type} ({len(type_entities)} items)")
+            lines.append(f"\n### {entity_type} ({len(type_entities)} items)")
             # Use configured display quantity and summary length
             display_count = self.ENTITIES_PER_TYPE_DISPLAY
             summary_len = self.ENTITY_SUMMARY_LENGTH
@@ -436,8 +428,7 @@ class SimulationConfigGenerator:
             if len(type_entities) > display_count:
                 lines.append(f"  ... {len(type_entities) - display_count} more")
         
-        return "
-".join(lines)
+        return "\n".join(lines)
     
     def _call_llm_with_retry(self, prompt: str, system_prompt: str) -> Dict[str, Any]:
         """LLM call with retry, includes JSON repair logic"""
@@ -521,8 +512,7 @@ class SimulationConfigGenerator:
             # Remove newlines from strings
             def fix_string(match):
                 s = match.group(0)
-                s = s.replace('
-', ' ').replace('', ' ')
+                s = s.replace('\n', ' ').replace('\r', ' ')
                 s = re.sub(r'\s+', ' ', s)
                 return s
             
@@ -673,12 +663,10 @@ Field descriptions:
             if len(type_examples[etype]) < 3:
                 type_examples[etype].append(e.name)
         
-        type_info = "
-".join([
+        type_info = "\n".join([
             f"- {t}: {', '.join(examples)}" 
             for t, examples in type_examples.items()
-        ])
-        
+        ])        
         # Use configured context truncation length
         context_truncated = context[:self.EVENT_CONFIG_CONTEXT_LENGTH]
         

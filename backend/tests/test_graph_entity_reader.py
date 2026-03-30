@@ -2,7 +2,6 @@
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-import pytest
 
 
 def _make_node(uuid: str, name: str, labels: list[str]) -> MagicMock:

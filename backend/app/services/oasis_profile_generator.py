@@ -10,19 +10,16 @@ Optimized improvements:
 
 import json
 import random
-import time
-import concurrent.futures
 import asyncio
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
-from threading import Lock
 
 from openai import OpenAI
 from ..config import Config
 from ..utils.logger import get_logger
 from ..utils.graphiti_client import create_graphiti_client
-from .graph_entity_reader import EntityNode, GraphEntityReader as ZepEntityReader
+from .graph_entity_reader import EntityNode
 
 logger = get_logger('mirofish.oasis_profile')
 
@@ -195,7 +192,7 @@ class OasisProfileGenerator:
         
         # graph_id must be set for search
         if not self.graph_id:
-            logger.debug(f"Skipping Graphiti retrieval: graph_id not set")
+            logger.debug("Skipping Graphiti retrieval: graph_id not set")
             return results
 
         entity_name = entity.name
