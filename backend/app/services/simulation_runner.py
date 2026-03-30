@@ -1,31 +1,29 @@
 """
 OASIS Simulation Runner
-Runs simulations in the background and records each Agent's actions, supporting real-time status monitoring.
+Runs simulations in the background, records Agent actions, and supports real-time status monitoring.
 """
 
 import os
 import sys
 import json
 import time
-import asyncio
 import threading
 import subprocess
 import signal
 import atexit
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from queue import Queue
 
-from ..config import Config
 from ..utils.logger import get_logger
 from .zep_graph_memory_updater import ZepGraphMemoryManager
-from .simulation_ipc import SimulationIPCClient, CommandType, IPCResponse
+from .simulation_ipc import SimulationIPCClient
 
 logger = get_logger('mirofish.simulation_runner')
 
-# Flag to check if cleanup function is already registered
+# Flag for registered cleanup function
 _cleanup_registered = False
 
 # Platform detection
@@ -103,13 +101,13 @@ class SimulationRunState:
     simulation_id: str
     runner_status: RunnerStatus = RunnerStatus.IDLE
     
-    # Progress information
+    # Progress info
     current_round: int = 0
     total_rounds: int = 0
     simulated_hours: int = 0
     total_simulation_hours: int = 0
     
-    # Independent rounds and simulated time for each platform (for dual-platform parallel display)
+    # Independent rounds and time per platform (for parallel display)
     twitter_current_round: int = 0
     reddit_current_round: int = 0
     twitter_simulated_hours: int = 0
@@ -137,14 +135,14 @@ class SimulationRunState:
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     completed_at: Optional[str] = None
     
-    # Error information
+    # Error info
     error: Optional[str] = None
     
     # Process ID (for stopping)
     process_pid: Optional[int] = None
     
     def add_action(self, action: AgentAction):
-        """Adds an action to the recent actions list"""
+        """Adds action to recent actions list"""
         self.recent_actions.insert(0, action)
         if len(self.recent_actions) > self.max_recent_actions:
             self.recent_actions = self.recent_actions[:self.max_recent_actions]
@@ -165,7 +163,7 @@ class SimulationRunState:
             "simulated_hours": self.simulated_hours,
             "total_simulation_hours": self.total_simulation_hours,
             "progress_percent": round(self.current_round / max(self.total_rounds, 1) * 100, 1),
-            # Independent rounds and simulated time for each platform
+            # Independent platform info
             "twitter_current_round": self.twitter_current_round,
             "reddit_current_round": self.reddit_current_round,
             "twitter_simulated_hours": self.twitter_simulated_hours,
@@ -185,7 +183,7 @@ class SimulationRunState:
         }
     
     def to_detail_dict(self) -> Dict[str, Any]:
-        """Contains detailed information about recent actions"""
+        """Detailed info including recent actions"""
         result = self.to_dict()
         result["recent_actions"] = [a.to_dict() for a in self.recent_actions]
         result["rounds_count"] = len(self.rounds)
@@ -197,13 +195,13 @@ class SimulationRunner:
     Simulation Runner
     
     Responsible for:
-    1. Running OASIS simulations in a background process
-    2. Parsing run logs and recording each Agent's actions
-    3. Providing real-time status query interface
-    4. Supporting pause/stop/resume operations
+    1. Running OASIS simulations in background processes.
+    2. Parsing run logs and recording Agent actions.
+    3. Providing real-time status queries.
+    4. Supporting pause/stop/resume operations.
     """
     
-    # Run state storage directory
+    # Directory for storing run state
     RUN_STATE_DIR = os.path.join(
         os.path.dirname(__file__),
         '../../uploads/simulations'
@@ -215,15 +213,15 @@ class SimulationRunner:
         '../../scripts'
     )
     
-    # In-memory run states
+    # In-memory run state
     _run_states: Dict[str, SimulationRunState] = {}
     _processes: Dict[str, subprocess.Popen] = {}
     _action_queues: Dict[str, Queue] = {}
     _monitor_threads: Dict[str, threading.Thread] = {}
-    _stdout_files: Dict[str, Any] = {}  # Stores stdout file handles
-    _stderr_files: Dict[str, Any] = {}  # Stores stderr file handles
+    _stdout_files: Dict[str, Any] = {}  # Store stdout file handles
+    _stderr_files: Dict[str, Any] = {}  # Store stderr file handles
     
-    # Graph memory update configuration
+    # Graph memory update config
     _graph_memory_enabled: Dict[str, bool] = {}  # simulation_id -> enabled
     
     @classmethod
@@ -232,7 +230,7 @@ class SimulationRunner:
         if simulation_id in cls._run_states:
             return cls._run_states[simulation_id]
         
-        # Try to load from file
+        # Try loading from file
         state = cls._load_run_state(simulation_id)
         if state:
             cls._run_states[simulation_id] = state
@@ -256,7 +254,7 @@ class SimulationRunner:
                 total_rounds=data.get("total_rounds", 0),
                 simulated_hours=data.get("simulated_hours", 0),
                 total_simulation_hours=data.get("total_simulation_hours", 0),
-                # Independent rounds and simulated time for each platform
+                # Independent platform info
                 twitter_current_round=data.get("twitter_current_round", 0),
                 reddit_current_round=data.get("reddit_current_round", 0),
                 twitter_simulated_hours=data.get("twitter_simulated_hours", 0),
@@ -313,19 +311,19 @@ class SimulationRunner:
         cls,
         simulation_id: str,
         platform: str = "parallel",  # twitter / reddit / parallel
-        max_rounds: int = None,  # Maximum number of simulation rounds (optional, for truncating long simulations)
-        enable_graph_memory_update: bool = False,  # Whether to update activities to Zep graph memory
-        graph_id: str = None  # Zep graph ID (required when graph update is enabled)
+        max_rounds: int = None,  # Optional max rounds for truncation
+        enable_graph_memory_update: bool = False,  # Whether to update activities to Zep graph
+        graph_id: str = None  # Required if update enabled
     ) -> SimulationRunState:
         """
-        Starts the simulation
+        Starts simulation
         
         Args:
             simulation_id: Simulation ID
-            platform: Platform to run on (twitter/reddit/parallel)
-            max_rounds: Maximum number of simulation rounds (optional, for truncating long simulations)
-            enable_graph_memory_update: Whether to dynamically update Agent activities to Zep graph memory
-            graph_id: Zep graph ID (required when graph update is enabled)
+            platform: Running platform (twitter/reddit/parallel)
+            max_rounds: Optional max rounds
+            enable_graph_memory_update: Dynamically update Agent activities to Zep graph
+            graph_id: Zep Graph ID (required if update enabled)
             
         Returns:
             SimulationRunState
@@ -333,25 +331,25 @@ class SimulationRunner:
         # Check if already running
         existing = cls.get_run_state(simulation_id)
         if existing and existing.runner_status in [RunnerStatus.RUNNING, RunnerStatus.STARTING]:
-            raise ValueError(f"Simulation is already running: {simulation_id}")
+            raise ValueError(f"Simulation already running: {simulation_id}")
         
-        # Load simulation configuration
+        # Load simulation config
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
         
         if not os.path.exists(config_path):
-            raise ValueError(f"Simulation configuration does not exist, please call /prepare interface first")
+            raise ValueError("Simulation config missing, call /prepare first")
         
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
         # Initialize run state
-        time_config = config.get("time_config", {}
+        time_config = config.get("time_config", {})
         total_hours = time_config.get("total_simulation_hours", 72)
         minutes_per_round = time_config.get("minutes_per_round", 30)
         total_rounds = int(total_hours * 60 / minutes_per_round)
         
-        # If max_rounds is specified, truncate
+        # Truncate if max_rounds specified
         if max_rounds is not None and max_rounds > 0:
             original_rounds = total_rounds
             total_rounds = min(total_rounds, max_rounds)
@@ -368,10 +366,10 @@ class SimulationRunner:
         
         cls._save_run_state(state)
         
-        # If graph memory update is enabled, create updater
+        # Enable graph memory update if requested
         if enable_graph_memory_update:
             if not graph_id:
-                raise ValueError("graph_id must be provided when enabling graph memory update")
+                raise ValueError("graph_id must be provided when graph memory update is enabled")
             
             try:
                 ZepGraphMemoryManager.create_updater(simulation_id, graph_id)
@@ -383,7 +381,7 @@ class SimulationRunner:
         else:
             cls._graph_memory_enabled[simulation_id] = False
         
-        # Determine which script to run (scripts are in backend/scripts/ directory)
+        # Determine script to run
         if platform == "twitter":
             script_name = "run_twitter_simulation.py"
             state.twitter_running = True
@@ -398,7 +396,7 @@ class SimulationRunner:
         script_path = os.path.join(cls.SCRIPTS_DIR, script_name)
         
         if not os.path.exists(script_path):
-            raise ValueError(f"Script does not exist: {script_path}")
+            raise ValueError(f"Script missing: {script_path}")
         
         # Create action queue
         action_queue = Queue()
@@ -406,49 +404,39 @@ class SimulationRunner:
         
         # Start simulation process
         try:
-            # Build run command, use full path
-            # New log structure:
-            #   twitter/actions.jsonl - Twitter action log
-            #   reddit/actions.jsonl  - Reddit action log
-            #   simulation.log        - Main process log
-            
             cmd = [
-                sys.executable,  # Python interpreter
+                sys.executable,
                 script_path,
-                "--config", config_path,  # Use full config file path
+                "--config", config_path,
             ]
             
-            # If max_rounds is specified, add to command-line arguments
             if max_rounds is not None and max_rounds > 0:
                 cmd.extend(["--max-rounds", str(max_rounds)])
             
-            # Create main log file to prevent stdout/stderr pipe buffer from filling up and blocking the process
+            # Create main log file to avoid stdout/stderr buffer full blocking process
             main_log_path = os.path.join(sim_dir, "simulation.log")
             main_log_file = open(main_log_path, 'w', encoding='utf-8')
             
-            # Set subprocess environment variables to ensure UTF-8 encoding on Windows
-            # This can fix issues where third-party libraries (e.g., OASIS) read files without specifying encoding
+            # Set child process environment, ensuring UTF-8 on Windows
             env = os.environ.copy()
-            env['PYTHONUTF8'] = '1'  # Python 3.7+ support, all open() default to UTF-8
-            env['PYTHONIOENCODING'] = 'utf-8'  # Ensure stdout/stderr use UTF-8
+            env['PYTHONUTF8'] = '1'
+            env['PYTHONIOENCODING'] = 'utf-8'
             
-            # Set working directory to simulation directory (database and other files will be generated here)
-            # Use start_new_session=True to create a new process group, ensuring all child processes can be terminated via os.killpg
+            # Use start_new_session=True to ensure child process group can be terminated
             process = subprocess.Popen(
                 cmd,
                 cwd=sim_dir,
                 stdout=main_log_file,
-                stderr=subprocess.STDOUT,  # stderr also writes to the same file
+                stderr=subprocess.STDOUT,
                 text=True,
-                encoding='utf-8',  # Explicitly specify encoding
+                encoding='utf-8',
                 bufsize=1,
-                env=env,  # Pass environment variables with UTF-8 settings
-                start_new_session=True,  # Create a new process group, ensuring all related processes can be terminated when the server shuts down
+                env=env,
+                start_new_session=True,
             )
             
-            # Save file handles for later closing
             cls._stdout_files[simulation_id] = main_log_file
-            cls._stderr_files[simulation_id] = None  # No longer need separate stderr
+            cls._stderr_files[simulation_id] = None
             
             state.process_pid = process.pid
             state.runner_status = RunnerStatus.RUNNING
@@ -464,7 +452,7 @@ class SimulationRunner:
             monitor_thread.start()
             cls._monitor_threads[simulation_id] = monitor_thread
             
-            logger.info(f"Simulation started successfully: {simulation_id}, pid={process.pid}, platform={platform}")
+            logger.info(f"Simulation started: {simulation_id}, pid={process.pid}, platform={platform}")
             
         except Exception as e:
             state.runner_status = RunnerStatus.FAILED
@@ -476,10 +464,9 @@ class SimulationRunner:
     
     @classmethod
     def _monitor_simulation(cls, simulation_id: str):
-        """Monitors the simulation process, parses action logs"""
+        """Monitors simulation process and parses action logs"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         
-        # New log structure: platform-specific action logs
         twitter_actions_log = os.path.join(sim_dir, "twitter", "actions.jsonl")
         reddit_actions_log = os.path.join(sim_dir, "reddit", "actions.jsonl")
         
@@ -493,30 +480,26 @@ class SimulationRunner:
         reddit_position = 0
         
         try:
-            while process.poll() is None:  # Process is still running
-                # Read Twitter action log
+            while process.poll() is None:
                 if os.path.exists(twitter_actions_log):
                     twitter_position = cls._read_action_log(
                         twitter_actions_log, twitter_position, state, "twitter"
                     )
                 
-                # Read Reddit action log
                 if os.path.exists(reddit_actions_log):
                     reddit_position = cls._read_action_log(
                         reddit_actions_log, reddit_position, state, "reddit"
                     )
                 
-                # Update status
                 cls._save_run_state(state)
                 time.sleep(2)
             
-            # After process ends, read logs one last time
+            # Final read after process exit
             if os.path.exists(twitter_actions_log):
                 cls._read_action_log(twitter_actions_log, twitter_position, state, "twitter")
             if os.path.exists(reddit_actions_log):
                 cls._read_action_log(reddit_actions_log, reddit_position, state, "reddit")
             
-            # Process ended
             exit_code = process.returncode
             
             if exit_code == 0:
@@ -525,13 +508,12 @@ class SimulationRunner:
                 logger.info(f"Simulation completed: {simulation_id}")
             else:
                 state.runner_status = RunnerStatus.FAILED
-                # Read error message from main log file
                 main_log_path = os.path.join(sim_dir, "simulation.log")
                 error_info = ""
                 try:
                     if os.path.exists(main_log_path):
                         with open(main_log_path, 'r', encoding='utf-8') as f:
-                            error_info = f.read()[-2000:]  # Get last 2000 characters
+                            error_info = f.read()[-2000:]
                 except Exception:
                     pass
                 state.error = f"Process exit code: {exit_code}, Error: {error_info}"
@@ -561,7 +543,7 @@ class SimulationRunner:
             cls._processes.pop(simulation_id, None)
             cls._action_queues.pop(simulation_id, None)
             
-            # Close log file handles
+            # Close file handles
             if simulation_id in cls._stdout_files:
                 try:
                     cls._stdout_files[simulation_id].close()
@@ -583,19 +565,7 @@ class SimulationRunner:
         state: SimulationRunState,
         platform: str
     ) -> int:
-        """
-        Reads action log file
-        
-        Args:
-            log_path: Log file path
-            position: Last read position
-            state: Run state object
-            platform: Platform name (twitter/reddit)
-            
-        Returns:
-            New read position
-        """
-        # Check if graph memory update is enabled
+        """Reads action log file"""
         graph_memory_enabled = cls._graph_memory_enabled.get(state.simulation_id, False)
         graph_updater = None
         if graph_memory_enabled:
@@ -610,36 +580,28 @@ class SimulationRunner:
                         try:
                             action_data = json.loads(line)
                             
-                            # Process event type entries
                             if "event_type" in action_data:
                                 event_type = action_data.get("event_type")
                                 
-                                # Detect simulation_end event, mark platform as completed
                                 if event_type == "simulation_end":
                                     if platform == "twitter":
                                         state.twitter_completed = True
                                         state.twitter_running = False
-                                        logger.info(f"Twitter simulation completed: {state.simulation_id}, total_rounds={action_data.get('total_rounds')}, total_actions={action_data.get('total_actions')}")
+                                        logger.info(f"Twitter simulation completed: {state.simulation_id}")
                                     elif platform == "reddit":
                                         state.reddit_completed = True
                                         state.reddit_running = False
-                                        logger.info(f"Reddit simulation completed: {state.simulation_id}, total_rounds={action_data.get('total_rounds')}, total_actions={action_data.get('total_actions')}")
+                                        logger.info(f"Reddit simulation completed: {state.simulation_id}")
                                     
-                                    # Check if all enabled platforms are completed
-                                    # If only one platform is running, only check that platform
-                                    # If two platforms are running, both need to be completed
-                                    all_completed = cls._check_all_platforms_completed(state)
-                                    if all_completed:
+                                    if cls._check_all_platforms_completed(state):
                                         state.runner_status = RunnerStatus.COMPLETED
                                         state.completed_at = datetime.now().isoformat()
                                         logger.info(f"All platform simulations completed: {state.simulation_id}")
                                 
-                                # Update round information (from round_end event)
                                 elif event_type == "round_end":
                                     round_num = action_data.get("round", 0)
                                     simulated_hours = action_data.get("simulated_hours", 0)
                                     
-                                    # Update independent rounds and time for each platform
                                     if platform == "twitter":
                                         if round_num > state.twitter_current_round:
                                             state.twitter_current_round = round_num
@@ -649,10 +611,8 @@ class SimulationRunner:
                                             state.reddit_current_round = round_num
                                         state.reddit_simulated_hours = simulated_hours
                                     
-                                    # Overall round number takes the maximum of the two platforms
                                     if round_num > state.current_round:
                                         state.current_round = round_num
-                                    # Overall simulated hours takes the maximum of the two platforms
                                     state.simulated_hours = max(state.twitter_simulated_hours, state.reddit_simulated_hours)
                                 
                                 continue
@@ -670,11 +630,9 @@ class SimulationRunner:
                             )
                             state.add_action(action)
                             
-                            # Update round number
                             if action.round_num and action.round_num > state.current_round:
                                 state.current_round = action.round_num
                             
-                            # If graph memory update is enabled, send activity to Zep
                             if graph_updater:
                                 graph_updater.add_activity_from_dict(action_data, platform)
                             
@@ -687,111 +645,73 @@ class SimulationRunner:
     
     @classmethod
     def _check_all_platforms_completed(cls, state: SimulationRunState) -> bool:
-        """
-        Checks if all enabled platforms have completed the simulation
-        
-        Determines which platforms are enabled by checking if the corresponding actions.jsonl file exists
-        
-        Returns:
-            True if all enabled platforms have completed
-        """
+        """Checks if all enabled platforms have completed the simulation"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, state.simulation_id)
         twitter_log = os.path.join(sim_dir, "twitter", "actions.jsonl")
         reddit_log = os.path.join(sim_dir, "reddit", "actions.jsonl")
         
-        # Check which platforms are enabled (by checking if file exists)
         twitter_enabled = os.path.exists(twitter_log)
         reddit_enabled = os.path.exists(reddit_log)
         
-        # If a platform is enabled but not completed, return False
         if twitter_enabled and not state.twitter_completed:
             return False
         if reddit_enabled and not state.reddit_completed:
             return False
         
-        # At least one platform is enabled and completed
         return twitter_enabled or reddit_enabled
     
     @classmethod
     def _terminate_process(cls, process: subprocess.Popen, simulation_id: str, timeout: int = 10):
-        """
-        Cross-platform termination of process and its child processes
-        
-        Args:
-            process: Process to terminate
-            simulation_id: Simulation ID (for logging)
-            timeout: Timeout for waiting for process to exit (seconds)
-        """
+        """Cross-platform termination of process and its children"""
         if IS_WINDOWS:
-            # Windows: Use taskkill command to terminate process tree
-            # /F = Force terminate, /T = Terminate process tree (including child processes)
             logger.info(f"Terminating process tree (Windows): simulation={simulation_id}, pid={process.pid}")
             try:
-                # First try to gracefully terminate
-                subprocess.run(
-                    ['taskkill', '/PID', str(process.pid), '/T'],
-                    capture_output=True,
-                    timeout=5
-                )
+                subprocess.run(['taskkill', '/PID', str(process.pid), '/T'], capture_output=True, timeout=5)
                 try:
                     process.wait(timeout=timeout)
                 except subprocess.TimeoutExpired:
-                    # Force terminate
-                    logger.warning(f"Process unresponsive, forcing termination: {simulation_id}")
-                    subprocess.run(
-                        ['taskkill', '/F', '/PID', str(process.pid), '/T'],
-                        capture_output=True,
-                        timeout=5
-                    )
+                    logger.warning(f"Process not responding, forcing: {simulation_id}")
+                    subprocess.run(['taskkill', '/F', '/PID', str(process.pid), '/T'], capture_output=True, timeout=5)
                     process.wait(timeout=5)
             except Exception as e:
-                logger.warning(f"taskkill failed, attempting terminate: {e}")
+                logger.warning(f"taskkill failed, trying terminate: {e}")
                 process.terminate()
                 try:
                     process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     process.kill()
         else:
-            # Unix: Use process group termination
-            # Since start_new_session=True is used, the process group ID equals the main process PID
             pgid = os.getpgid(process.pid)
             logger.info(f"Terminating process group (Unix): simulation={simulation_id}, pgid={pgid}")
-            
-            # First send SIGTERM to the entire process group
             os.killpg(pgid, signal.SIGTERM)
-            
             try:
                 process.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
-                # If still not terminated after timeout, force send SIGKILL
-                logger.warning(f"Process group unresponsive to SIGTERM, forcing termination: {simulation_id}")
+                logger.warning(f"Process group not responding to SIGTERM, forcing: {simulation_id}")
                 os.killpg(pgid, signal.SIGKILL)
                 process.wait(timeout=5)
     
     @classmethod
     def stop_simulation(cls, simulation_id: str) -> SimulationRunState:
-        """Stops the simulation"""
+        """Stops simulation"""
         state = cls.get_run_state(simulation_id)
         if not state:
             raise ValueError(f"Simulation does not exist: {simulation_id}")
         
         if state.runner_status not in [RunnerStatus.RUNNING, RunnerStatus.PAUSED]:
-            raise ValueError(f"Simulation is not running: {simulation_id}, status={state.runner_status}")
+            raise ValueError(f"Simulation not running: {simulation_id}, status={state.runner_status}")
         
         state.runner_status = RunnerStatus.STOPPING
         cls._save_run_state(state)
         
-        # Terminate process
         process = cls._processes.get(simulation_id)
         if process and process.poll() is None:
             try:
                 cls._terminate_process(process, simulation_id)
             except ProcessLookupError:
-                # Process may no longer exist
                 pass
             except Exception as e:
                 logger.error(f"Failed to terminate process group: {simulation_id}, error={e}")
-                # Fallback to direct process termination
                 try:
                     process.terminate()
                     process.wait(timeout=5)
@@ -804,7 +724,6 @@ class SimulationRunner:
         state.completed_at = datetime.now().isoformat()
         cls._save_run_state(state)
         
-        # Stop graph memory updater
         if cls._graph_memory_enabled.get(simulation_id, False):
             try:
                 ZepGraphMemoryManager.stop_updater(simulation_id)
@@ -825,42 +744,24 @@ class SimulationRunner:
         agent_id: Optional[int] = None,
         round_num: Optional[int] = None
     ) -> List[AgentAction]:
-        """
-        Reads actions from a single action file
-        
-        Args:
-            file_path: Action log file path
-            default_platform: Default platform (used when action record has no platform field)
-            platform_filter: Filter platform
-            agent_id: Filter Agent ID
-            round_num: Filter round number
-        """
+        """Reads actions from a single action file"""
         if not os.path.exists(file_path):
             return []
         
         actions = []
-        
         with open(file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if not line:
                     continue
-                
                 try:
                     data = json.loads(line)
-                    
-                    # Skip non-action records (e.g., simulation_start, round_start, round_end events)
                     if "event_type" in data:
                         continue
-                    
-                    # Skip records without agent_id (non-Agent actions)
                     if "agent_id" not in data:
                         continue
                     
-                    # Get platform: prioritize platform field in record, otherwise use default platform
                     record_platform = data.get("platform") or default_platform or ""
-                    
-                    # Filter
                     if platform_filter and record_platform != platform_filter:
                         continue
                     if agent_id is not None and data.get("agent_id") != agent_id:
@@ -879,10 +780,8 @@ class SimulationRunner:
                         result=data.get("result"),
                         success=data.get("success", True),
                     ))
-                    
                 except json.JSONDecodeError:
                     continue
-        
         return actions
     
     @classmethod
@@ -893,57 +792,31 @@ class SimulationRunner:
         agent_id: Optional[int] = None,
         round_num: Optional[int] = None
     ) -> List[AgentAction]:
-        """
-        Gets complete action history for all platforms (no pagination limit)
-        
-        Args:
-            simulation_id: Simulation ID
-            platform: Filter platform (twitter/reddit)
-            agent_id: Filter Agent
-            round_num: Filter round number
-            
-        Returns:
-            Complete list of actions (sorted by timestamp, newest first)
-        """
+        """Gets full action history across all platforms"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         actions = []
         
-        # Read Twitter action file (automatically set platform to twitter based on file path)
         twitter_actions_log = os.path.join(sim_dir, "twitter", "actions.jsonl")
         if not platform or platform == "twitter":
             actions.extend(cls._read_actions_from_file(
-                twitter_actions_log,
-                default_platform="twitter",  # Auto-fill platform field
-                platform_filter=platform,
-                agent_id=agent_id, 
-                round_num=round_num
+                twitter_actions_log, default_platform="twitter",
+                platform_filter=platform, agent_id=agent_id, round_num=round_num
             ))
         
-        # Read Reddit action file (automatically set platform to reddit based on file path)
         reddit_actions_log = os.path.join(sim_dir, "reddit", "actions.jsonl")
         if not platform or platform == "reddit":
             actions.extend(cls._read_actions_from_file(
-                reddit_actions_log,
-                default_platform="reddit",  # Auto-fill platform field
-                platform_filter=platform,
-                agent_id=agent_id,
-                round_num=round_num
+                reddit_actions_log, default_platform="reddit",
+                platform_filter=platform, agent_id=agent_id, round_num=round_num
             ))
         
-        # If platform-specific files do not exist, try to read old single-file format
         if not actions:
             actions_log = os.path.join(sim_dir, "actions.jsonl")
             actions = cls._read_actions_from_file(
-                actions_log,
-                default_platform=None,  # Old format files should have a platform field
-                platform_filter=platform,
-                agent_id=agent_id,
-                round_num=round_num
+                actions_log, platform_filter=platform, agent_id=agent_id, round_num=round_num
             )
         
-        # Sort by timestamp (newest first)
         actions.sort(key=lambda x: x.timestamp, reverse=True)
-        
         return actions
     
     @classmethod
@@ -956,28 +829,11 @@ class SimulationRunner:
         agent_id: Optional[int] = None,
         round_num: Optional[int] = None
     ) -> List[AgentAction]:
-        """
-        Gets action history (with pagination)
-        
-        Args:
-            simulation_id: Simulation ID
-            limit: Return quantity limit
-            offset: Offset
-            platform: Filter platform
-            agent_id: Filter Agent
-            round_num: Filter round number
-            
-        Returns:
-            List of actions
-        """
+        """Gets action history (paginated)"""
         actions = cls.get_all_actions(
-            simulation_id=simulation_id,
-            platform=platform,
-            agent_id=agent_id,
-            round_num=round_num
+            simulation_id=simulation_id, platform=platform,
+            agent_id=agent_id, round_num=round_num
         )
-        
-        # Pagination
         return actions[offset:offset + limit]
     
     @classmethod
@@ -987,25 +843,12 @@ class SimulationRunner:
         start_round: int = 0,
         end_round: Optional[int] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Gets simulation timeline (summarized by round)
-        
-        Args:
-            simulation_id: Simulation ID
-            start_round: Start round
-            end_round: End round
-            
-        Returns:
-            Summarized information for each round
-        """
+        """Gets simulation timeline aggregated by rounds"""
         actions = cls.get_actions(simulation_id, limit=10000)
-        
-        # Group by round
         rounds: Dict[int, Dict[str, Any]] = {}
         
         for action in actions:
             round_num = action.round_num
-            
             if round_num < start_round:
                 continue
             if end_round is not None and round_num > end_round:
@@ -1017,13 +860,12 @@ class SimulationRunner:
                     "twitter_actions": 0,
                     "reddit_actions": 0,
                     "active_agents": set(),
-                    "action_types": {}
+                    "action_types": {},
                     "first_action_time": action.timestamp,
                     "last_action_time": action.timestamp,
                 }
             
             r = rounds[round_num]
-            
             if action.platform == "twitter":
                 r["twitter_actions"] += 1
             else:
@@ -1033,7 +875,6 @@ class SimulationRunner:
             r["action_types"][action.action_type] = r["action_types"].get(action.action_type, 0) + 1
             r["last_action_time"] = action.timestamp
         
-        # Convert to list
         result = []
         for round_num in sorted(rounds.keys()):
             r = rounds[round_num]
@@ -1048,24 +889,16 @@ class SimulationRunner:
                 "first_action_time": r["first_action_time"],
                 "last_action_time": r["last_action_time"],
             })
-        
         return result
     
     @classmethod
     def get_agent_stats(cls, simulation_id: str) -> List[Dict[str, Any]]:
-        """
-        Gets statistics for each Agent
-        
-        Returns:
-            Agent statistics list
-        """
+        """Gets stats for each Agent"""
         actions = cls.get_actions(simulation_id, limit=10000)
-        
         agent_stats: Dict[int, Dict[str, Any]] = {}
         
         for action in actions:
             agent_id = action.agent_id
-            
             if agent_id not in agent_stats:
                 agent_stats[agent_id] = {
                     "agent_id": agent_id,
@@ -1073,14 +906,13 @@ class SimulationRunner:
                     "total_actions": 0,
                     "twitter_actions": 0,
                     "reddit_actions": 0,
-                    "action_types": {}
+                    "action_types": {},
                     "first_action_time": action.timestamp,
                     "last_action_time": action.timestamp,
                 }
             
             stats = agent_stats[agent_id]
             stats["total_actions"] += 1
-            
             if action.platform == "twitter":
                 stats["twitter_actions"] += 1
             else:
@@ -1089,59 +921,23 @@ class SimulationRunner:
             stats["action_types"][action.action_type] = stats["action_types"].get(action.action_type, 0) + 1
             stats["last_action_time"] = action.timestamp
         
-        # Sort by total actions
-        result = sorted(agent_stats.values(), key=lambda x: x["total_actions"], reverse=True)
-        
-        return result
+        return sorted(agent_stats.values(), key=lambda x: x["total_actions"], reverse=True)
     
     @classmethod
     def cleanup_simulation_logs(cls, simulation_id: str) -> Dict[str, Any]:
-        """
-        Cleans up simulation run logs (for forcefully restarting simulation)
-        
-        Deletes the following files:
-        - run_state.json
-        - twitter/actions.jsonl
-        - reddit/actions.jsonl
-        - simulation.log
-        - stdout.log / stderr.log
-        - twitter_simulation.db (simulation database)
-        - reddit_simulation.db (simulation database)
-        - env_status.json (environment status)
-        
-        Note: Does not delete configuration files (simulation_config.json) and profile files
-        
-        Args:
-            simulation_id: Simulation ID
-            
-        Returns:
-            Cleanup result information
-        """
-        import shutil
-        
+        """Cleans simulation run logs for forced restart"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        
         if not os.path.exists(sim_dir):
-            return {"success": True, "message": "Simulation directory does not exist, no cleanup needed"}
+            return {"success": True, "message": "Simulation directory missing, no cleanup needed"}
         
         cleaned_files = []
         errors = []
-        
-        # List of files to delete (including database files)
         files_to_delete = [
-            "run_state.json",
-            "simulation.log",
-            "stdout.log",
-            "stderr.log",
-            "twitter_simulation.db",  # Twitter platform database
-            "reddit_simulation.db",   # Reddit platform database
-            "env_status.json",        # Environment status file
+            "run_state.json", "simulation.log", "stdout.log", "stderr.log",
+            "twitter_simulation.db", "reddit_simulation.db", "env_status.json",
         ]
-        
-        # List of directories to clean (contains action logs)
         dirs_to_clean = ["twitter", "reddit"]
         
-        # Delete files
         for filename in files_to_delete:
             file_path = os.path.join(sim_dir, filename)
             if os.path.exists(file_path):
@@ -1151,7 +947,6 @@ class SimulationRunner:
                 except Exception as e:
                     errors.append(f"Failed to delete {filename}: {str(e)}")
         
-        # Clean up action logs in platform directories
         for dir_name in dirs_to_clean:
             dir_path = os.path.join(sim_dir, dir_name)
             if os.path.exists(dir_path):
@@ -1163,69 +958,49 @@ class SimulationRunner:
                     except Exception as e:
                         errors.append(f"Failed to delete {dir_name}/actions.jsonl: {str(e)}")
         
-        # Clean up in-memory run states
         if simulation_id in cls._run_states:
             del cls._run_states[simulation_id]
         
-        logger.info(f"Simulation log cleanup complete: {simulation_id}, Deleted files: {cleaned_files}")
-        
+        logger.info(f"Cleanup of simulation logs completed: {simulation_id}, removed: {cleaned_files}")
         return {
             "success": len(errors) == 0,
             "cleaned_files": cleaned_files,
             "errors": errors if errors else None
         }
     
-    # Flag to prevent duplicate cleanup
     _cleanup_done = False
     
     @classmethod
     def cleanup_all_simulations(cls):
-        """
-        Cleans up all running simulation processes
-        
-        Called when the server shuts down, ensuring all child processes are terminated
-        """
-        # Prevent duplicate cleanup
+        """Cleans all running simulation processes during server shutdown"""
         if cls._cleanup_done:
             return
         cls._cleanup_done = True
         
-        # Check if there's anything to clean up (avoid printing useless logs for empty processes)
-        has_processes = bool(cls._processes)
-        has_updaters = bool(cls._graph_memory_enabled)
-        
-        if not has_processes and not has_updaters:
-            return  # Nothing to clean up, return silently
+        if not cls._processes and not cls._graph_memory_enabled:
+            return
         
         logger.info("Cleaning up all simulation processes...")
-        
-        # First stop all graph memory updaters (stop_all will print logs internally)
         try:
             ZepGraphMemoryManager.stop_all()
         except Exception as e:
             logger.error(f"Failed to stop graph memory updaters: {e}")
         cls._graph_memory_enabled.clear()
         
-        # Copy dictionary to avoid modifying during iteration
         processes = list(cls._processes.items())
-        
         for simulation_id, process in processes:
             try:
-                if process.poll() is None:  # Process is still running
+                if process.poll() is None:
                     logger.info(f"Terminating simulation process: {simulation_id}, pid={process.pid}")
-                    
                     try:
-                        # Use cross-platform process termination method
                         cls._terminate_process(process, simulation_id, timeout=5)
                     except (ProcessLookupError, OSError):
-                        # Process may no longer exist, try direct termination
                         try:
                             process.terminate()
                             process.wait(timeout=3)
                         except Exception:
                             process.kill()
                     
-                    # Update run_state.json
                     state = cls.get_run_state(simulation_id)
                     if state:
                         state.runner_status = RunnerStatus.STOPPED
@@ -1235,11 +1010,9 @@ class SimulationRunner:
                         state.error = "Server shutdown, simulation terminated"
                         cls._save_run_state(state)
                     
-                    # Also update state.json, set status to stopped
                     try:
                         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
                         state_file = os.path.join(sim_dir, "state.json")
-                        logger.info(f"Attempting to update state.json: {state_file}")
                         if os.path.exists(state_file):
                             with open(state_file, 'r', encoding='utf-8') as f:
                                 state_data = json.load(f)
@@ -1247,166 +1020,98 @@ class SimulationRunner:
                             state_data['updated_at'] = datetime.now().isoformat()
                             with open(state_file, 'w', encoding='utf-8') as f:
                                 json.dump(state_data, f, indent=2, ensure_ascii=False)
-                            logger.info(f"state.json status updated to stopped: {simulation_id}")
-                        else:
-                            logger.warning(f"state.json does not exist: {state_file}")
+                            logger.info(f"Updated state.json status to stopped: {simulation_id}")
                     except Exception as state_err:
                         logger.warning(f"Failed to update state.json: {simulation_id}, error={state_err}")
-                        
             except Exception as e:
-                logger.error(f"Failed to clean up process: {simulation_id}, error={e}")
+                logger.error(f"Cleanup process failed: {simulation_id}, error={e}")
         
-        # Clean up file handles
         for simulation_id, file_handle in list(cls._stdout_files.items()):
-            try:
-                if file_handle:
-                    file_handle.close()
-            except Exception:
-                pass
+            if file_handle:
+                file_handle.close()
         cls._stdout_files.clear()
         
         for simulation_id, file_handle in list(cls._stderr_files.items()):
-            try:
-                if file_handle:
-                    file_handle.close()
-            except Exception:
-                pass
+            if file_handle:
+                file_handle.close()
         cls._stderr_files.clear()
         
-        # Clean up in-memory states
         cls._processes.clear()
         cls._action_queues.clear()
-        
-        logger.info("Simulation process cleanup complete")
+        logger.info("Simulation process cleanup completed")
     
     @classmethod
     def register_cleanup(cls):
-        """
-        Registers cleanup function
-        
-        Called when the Flask application starts, ensuring all simulation processes are cleaned up when the server shuts down
-        """
+        """Registers cleanup function to be called on server shutdown"""
         global _cleanup_registered
-        
         if _cleanup_registered:
             return
         
-        # In Flask debug mode, register cleanup only in the reloader subprocess (the process that actually runs the application)
-        # WERKZEUG_RUN_MAIN=true indicates it's the reloader subprocess
-        # If not in debug mode, this environment variable is not present, and it also needs to be registered
         is_reloader_process = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
         is_debug_mode = os.environ.get('FLASK_DEBUG') == '1' or os.environ.get('WERKZEUG_RUN_MAIN') is not None
-        
-        # In debug mode, only register in reloader subprocess; in non-debug mode, always register
         if is_debug_mode and not is_reloader_process:
-            _cleanup_registered = True  # Mark as registered to prevent child processes from trying again
+            _cleanup_registered = True
             return
         
-        # Save original signal handlers
         original_sigint = signal.getsignal(signal.SIGINT)
         original_sigterm = signal.getsignal(signal.SIGTERM)
-        # SIGHUP only exists on Unix systems (macOS/Linux), not Windows
         original_sighup = None
         has_sighup = hasattr(signal, 'SIGHUP')
         if has_sighup:
             original_sighup = signal.getsignal(signal.SIGHUP)
         
         def cleanup_handler(signum=None, frame=None):
-            """Signal handler: first clean up simulation processes, then call original handler"""
-            # Only log if there are processes to clean up
             if cls._processes or cls._graph_memory_enabled:
                 logger.info(f"Received signal {signum}, starting cleanup...")
             cls.cleanup_all_simulations()
-            
-            # Call original signal handler to allow Flask to exit normally
             if signum == signal.SIGINT and callable(original_sigint):
                 original_sigint(signum, frame)
             elif signum == signal.SIGTERM and callable(original_sigterm):
                 original_sigterm(signum, frame)
             elif has_sighup and signum == signal.SIGHUP:
-                # SIGHUP: sent when terminal closes
                 if callable(original_sighup):
                     original_sighup(signum, frame)
                 else:
-                    # Default behavior: exit normally
                     sys.exit(0)
             else:
-                # If original handler is not callable (e.g., SIG_DFL), use default behavior
                 raise KeyboardInterrupt
         
-        # Register atexit handler (as a fallback)
         atexit.register(cls.cleanup_all_simulations)
-        
-        # Register signal handlers (only in main thread)
         try:
-            # SIGTERM: default signal for kill command
             signal.signal(signal.SIGTERM, cleanup_handler)
-            # SIGINT: Ctrl+C
             signal.signal(signal.SIGINT, cleanup_handler)
-            # SIGHUP: terminal close (Unix systems only)
             if has_sighup:
                 signal.signal(signal.SIGHUP, cleanup_handler)
         except ValueError:
-            # Not in main thread, can only use atexit
-            logger.warning("Cannot register signal handlers (not in main thread), only using atexit")
+            logger.warning("Could not register signal handlers (not in main thread), using atexit only")
         
         _cleanup_registered = True
     
     @classmethod
     def get_running_simulations(cls) -> List[str]:
-        """
-        Gets a list of all running simulation IDs
-        """
+        """Gets list of all running simulation IDs"""
         running = []
         for sim_id, process in cls._processes.items():
             if process.poll() is None:
                 running.append(sim_id)
         return running
     
-    # ============== Interview Functionality ==============
-    
     @classmethod
     def check_env_alive(cls, simulation_id: str) -> bool:
-        """
-        Checks if the simulation environment is alive (can receive Interview commands)
-
-        Args:
-            simulation_id: Simulation ID
-
-        Returns:
-            True if environment is alive, False if environment is closed
-        """
+        """Checks if simulation environment is alive to receive Interview commands"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
             return False
-
-        ipc_client = SimulationIPCClient(sim_dir)
-        return ipc_client.check_env_alive()
+        return SimulationIPCClient(sim_dir).check_env_alive()
 
     @classmethod
     def get_env_status_detail(cls, simulation_id: str) -> Dict[str, Any]:
-        """
-        Gets detailed status information of the simulation environment
-
-        Args:
-            simulation_id: Simulation ID
-
-        Returns:
-            Status detail dictionary, includes status, twitter_available, reddit_available, timestamp
-        """
+        """Gets detailed status info of simulation environment"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         status_file = os.path.join(sim_dir, "env_status.json")
-        
-        default_status = {
-            "status": "stopped",
-            "twitter_available": False,
-            "reddit_available": False,
-            "timestamp": None
-        }
-        
+        default_status = {"status": "stopped", "twitter_available": False, "reddit_available": False, "timestamp": None}
         if not os.path.exists(status_file):
             return default_status
-        
         try:
             with open(status_file, 'r', encoding='utf-8') as f:
                 status = json.load(f)
@@ -1428,60 +1133,20 @@ class SimulationRunner:
         platform: str = None,
         timeout: float = 60.0
     ) -> Dict[str, Any]:
-        """
-        Interviews a single Agent
-
-        Args:
-            simulation_id: Simulation ID
-            agent_id: Agent ID
-            prompt: Interview question
-            platform: Specified platform (optional)
-                - "twitter": Only interview Twitter platform
-                - "reddit": Only interview Reddit platform
-                - None: When dual-platform simulation, interview both platforms simultaneously, return integrated results
-            timeout: Timeout (seconds)
-
-        Returns:
-            Interview result dictionary
-
-        Raises:
-            ValueError: Simulation does not exist or environment not running
-            TimeoutError: Timeout waiting for response
-        """
+        """Interviews a single Agent"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"Simulation does not exist: {simulation_id}")
-
+            raise ValueError(f"Simulation missing: {simulation_id}")
         ipc_client = SimulationIPCClient(sim_dir)
-
         if not ipc_client.check_env_alive():
-            raise ValueError(f"Simulation environment is not running or has closed, cannot execute Interview: {simulation_id}")
-
+            raise ValueError(f"Environment not running/closed, cannot interview: {simulation_id}")
+        
         logger.info(f"Sending Interview command: simulation_id={simulation_id}, agent_id={agent_id}, platform={platform}")
-
-        response = ipc_client.send_interview(
-            agent_id=agent_id,
-            prompt=prompt,
-            platform=platform,
-            timeout=timeout
-        )
-
+        response = ipc_client.send_interview(agent_id=agent_id, prompt=prompt, platform=platform, timeout=timeout)
         if response.status.value == "completed":
-            return {
-                "success": True,
-                "agent_id": agent_id,
-                "prompt": prompt,
-                "result": response.result,
-                "timestamp": response.timestamp
-            }
+            return {"success": True, "agent_id": agent_id, "prompt": prompt, "result": response.result, "timestamp": response.timestamp}
         else:
-            return {
-                "success": False,
-                "agent_id": agent_id,
-                "prompt": prompt,
-                "error": response.error,
-                "timestamp": response.timestamp
-            }
+            return {"success": False, "agent_id": agent_id, "prompt": prompt, "error": response.error, "timestamp": response.timestamp}
     
     @classmethod
     def interview_agents_batch(
@@ -1491,56 +1156,20 @@ class SimulationRunner:
         platform: str = None,
         timeout: float = 120.0
     ) -> Dict[str, Any]:
-        """
-        Interviews multiple Agents in batch
-
-        Args:
-            simulation_id: Simulation ID
-            interviews: List of interviews, each element contains {"agent_id": int, "prompt": str, "platform": str (optional)}
-            platform: Default platform (optional, will be overridden by each interview item's platform)
-                - "twitter": Default to only interview Twitter platform
-                - "reddit": Default to only interview Reddit platform
-                - None: When dual-platform simulation, each Agent interviews both platforms simultaneously
-            timeout: Timeout (seconds)
-
-        Returns:
-            Batch interview result dictionary
-
-        Raises:
-            ValueError: Simulation does not exist or environment not running
-            TimeoutError: Timeout waiting for response
-        """
+        """Interviews multiple Agents in batch"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"Simulation does not exist: {simulation_id}")
-
+            raise ValueError(f"Simulation missing: {simulation_id}")
         ipc_client = SimulationIPCClient(sim_dir)
-
         if not ipc_client.check_env_alive():
-            raise ValueError(f"Simulation environment is not running or has closed, cannot execute Interview: {simulation_id}")
-
+            raise ValueError(f"Environment not running/closed, cannot interview: {simulation_id}")
+        
         logger.info(f"Sending batch Interview command: simulation_id={simulation_id}, count={len(interviews)}, platform={platform}")
-
-        response = ipc_client.send_batch_interview(
-            interviews=interviews,
-            platform=platform,
-            timeout=timeout
-        )
-
+        response = ipc_client.send_batch_interview(interviews=interviews, platform=platform, timeout=timeout)
         if response.status.value == "completed":
-            return {
-                "success": True,
-                "interviews_count": len(interviews),
-                "result": response.result,
-                "timestamp": response.timestamp
-            }
+            return {"success": True, "interviews_count": len(interviews), "result": response.result, "timestamp": response.timestamp}
         else:
-            return {
-                "success": False,
-                "interviews_count": len(interviews),
-                "error": response.error,
-                "timestamp": response.timestamp
-            }
+            return {"success": False, "interviews_count": len(interviews), "error": response.error, "timestamp": response.timestamp}
     
     @classmethod
     def interview_all_agents(
@@ -1550,57 +1179,23 @@ class SimulationRunner:
         platform: str = None,
         timeout: float = 180.0
     ) -> Dict[str, Any]:
-        """
-        Interviews all Agents (global interview)
-
-        Interviews all Agents in the simulation with the same question
-
-        Args:
-            simulation_id: Simulation ID
-            prompt: Interview question (all Agents use the same question)
-            platform: Specified platform (optional)
-                - "twitter": Only interview Twitter platform
-                - "reddit": Only interview Reddit platform
-                - None: When dual-platform simulation, each Agent interviews both platforms simultaneously
-            timeout: Timeout (seconds)
-
-        Returns:
-            Global interview result dictionary
-        """
+        """Interviews all Agents in simulation"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"Simulation does not exist: {simulation_id}")
-
-        # Get all Agent information from the config file
+            raise ValueError(f"Simulation missing: {simulation_id}")
         config_path = os.path.join(sim_dir, "simulation_config.json")
         if not os.path.exists(config_path):
-            raise ValueError(f"Simulation configuration does not exist: {simulation_id}")
-
+            raise ValueError(f"Simulation config missing: {simulation_id}")
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
-
+        
         agent_configs = config.get("agent_configs", [])
         if not agent_configs:
-            raise ValueError(f"No Agents in simulation configuration: {simulation_id}")
-
-        # Build batch interview list
-        interviews = []
-        for agent_config in agent_configs:
-            agent_id = agent_config.get("agent_id")
-            if agent_id is not None:
-                interviews.append({
-                    "agent_id": agent_id,
-                    "prompt": prompt
-                })
-
-        logger.info(f"Sending global Interview command: simulation_id={simulation_id}, agent_count={len(interviews)}, platform={platform}")
-
-        return cls.interview_agents_batch(
-            simulation_id=simulation_id,
-            interviews=interviews,
-            platform=platform,
-            timeout=timeout
-        )
+            raise ValueError(f"No Agents in config: {simulation_id}")
+        
+        interviews = [{"agent_id": ac.get("agent_id"), "prompt": prompt} for ac in agent_configs if ac.get("agent_id") is not None]
+        logger.info(f"Sending global Interview command: simulation_id={simulation_id}, count={len(interviews)}, platform={platform}")
+        return cls.interview_agents_batch(simulation_id=simulation_id, interviews=interviews, platform=platform, timeout=timeout)
     
     @classmethod
     def close_simulation_env(
@@ -1608,47 +1203,23 @@ class SimulationRunner:
         simulation_id: str,
         timeout: float = 30.0
     ) -> Dict[str, Any]:
-        """
-        Closes the simulation environment (does not stop the simulation process)
-        
-        Sends a close environment command to the simulation, causing it to gracefully exit command-waiting mode
-        
-        Args:
-            simulation_id: Simulation ID
-            timeout: Timeout (seconds)
-            
-        Returns:
-            Operation result dictionary
-        """
+        """Closes simulation environment gracefully"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
         if not os.path.exists(sim_dir):
-            raise ValueError(f"Simulation does not exist: {simulation_id}")
-        
+            raise ValueError(f"Simulation missing: {simulation_id}")
         ipc_client = SimulationIPCClient(sim_dir)
-        
         if not ipc_client.check_env_alive():
-            return {
-                "success": True,
-                "message": "Environment is already closed"
-            }
+            return {"success": True, "message": "Environment already closed"}
         
         logger.info(f"Sending close environment command: simulation_id={simulation_id}")
-        
         try:
             response = ipc_client.send_close_env(timeout=timeout)
-            
             return {
-                "success": response.status.value == "completed",
-                "message": "Environment close command sent",
-                "result": response.result,
-                "timestamp": response.timestamp
+                "success": response.status.value == "completed", "message": "Close environment command sent",
+                "result": response.result, "timestamp": response.timestamp
             }
         except TimeoutError:
-            # Timeout may be because environment is already closing
-            return {
-                "success": True,
-                "message": "Environment close command sent (timeout waiting for response, environment may be closing)"
-            }
+            return {"success": True, "message": "Close environment command sent (timeout waiting for response, likely closing)"}
     
     @classmethod
     def _get_interview_history_from_db(
@@ -1660,52 +1231,32 @@ class SimulationRunner:
     ) -> List[Dict[str, Any]]:
         """Gets Interview history from a single database"""
         import sqlite3
-        
         if not os.path.exists(db_path):
             return []
-        
         results = []
-        
         try:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            
             if agent_id is not None:
                 cursor.execute("""
-                    SELECT user_id, info, created_at
-                    FROM trace
-                    WHERE action = 'interview' AND user_id = ?
-                    ORDER BY created_at DESC
-                    LIMIT ?
+                    SELECT user_id, info, created_at FROM trace WHERE action = 'interview' AND user_id = ?
+                    ORDER BY created_at DESC LIMIT ?
                 """, (agent_id, limit))
             else:
-                cursor.execute("""
-                    SELECT user_id, info, created_at
-                    FROM trace
-                    WHERE action = 'interview'
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                """, (limit,))
+                cursor.execute("SELECT user_id, info, created_at FROM trace WHERE action = 'interview' ORDER BY created_at DESC LIMIT ?", (limit,))
             
             for user_id, info_json, created_at in cursor.fetchall():
                 try:
                     info = json.loads(info_json) if info_json else {}
                 except json.JSONDecodeError:
                     info = {"raw": info_json}
-                
                 results.append({
-                    "agent_id": user_id,
-                    "response": info.get("response", info),
-                    "prompt": info.get("prompt", ""),
-                    "timestamp": created_at,
-                    "platform": platform_name
+                    "agent_id": user_id, "response": info.get("response", info), "prompt": info.get("prompt", ""),
+                    "timestamp": created_at, "platform": platform_name
                 })
-            
             conn.close()
-            
         except Exception as e:
             logger.error(f"Failed to read Interview history ({platform_name}): {e}")
-        
         return results
 
     @classmethod
@@ -1716,47 +1267,13 @@ class SimulationRunner:
         agent_id: Optional[int] = None,
         limit: int = 100
     ) -> List[Dict[str, Any]]:
-        """
-        Gets Interview history records (reads from database)
-        
-        Args:
-            simulation_id: Simulation ID
-            platform: Platform type (reddit/twitter/None)
-                - "reddit": Only get Reddit platform history
-                - "twitter": Only get Twitter platform history
-                - None: Get all history for both platforms
-            agent_id: Specified Agent ID (optional, only get history for this Agent)
-            limit: Limit on number of results per platform
-            
-        Returns:
-            List of Interview history records
-        """
+        """Gets Interview history from database"""
         sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
-        
         results = []
-        
-        # Determine platforms to query
-        if platform in ("reddit", "twitter"):
-            platforms = [platform]
-        else:
-            # If no platform specified, query both platforms
-            platforms = ["twitter", "reddit"]
-        
+        platforms = [platform] if platform in ("reddit", "twitter") else ["twitter", "reddit"]
         for p in platforms:
             db_path = os.path.join(sim_dir, f"{p}_simulation.db")
-            platform_results = cls._get_interview_history_from_db(
-                db_path=db_path,
-                platform_name=p,
-                agent_id=agent_id,
-                limit=limit
-            )
-            results.extend(platform_results)
+            results.extend(cls._get_interview_history_from_db(db_path=db_path, platform_name=p, agent_id=agent_id, limit=limit))
         
-        # Sort by time in descending order
         results.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-        
-        # If multiple platforms were queried, limit total count
-        if len(platforms) > 1 and len(results) > limit:
-            results = results[:limit]
-        
-        return results
+        return results[:limit] if len(platforms) > 1 else results

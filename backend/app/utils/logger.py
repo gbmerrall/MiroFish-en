@@ -1,6 +1,6 @@
 """
-Log Configuration Module
-Provides unified log management, outputting to console and file simultaneously.
+Logging Configuration Module
+Provides unified logging management, outputting to both console and file simultaneously.
 """
 
 import os
@@ -13,10 +13,10 @@ from logging.handlers import RotatingFileHandler
 def _ensure_utf8_stdout():
     """
     Ensures stdout/stderr use UTF-8 encoding.
-    Resolves garbled Chinese characters in Windows console.
+    Resolves Windows console Chinese character encoding issues.
     """
     if sys.platform == 'win32':
-        # Reconfigure standard output for UTF-8 on Windows
+        # Reconfigure standard output to UTF-8 on Windows
         if hasattr(sys.stdout, 'reconfigure'):
             sys.stdout.reconfigure(encoding='utf-8', errors='replace')
         if hasattr(sys.stderr, 'reconfigure'):
@@ -29,7 +29,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)
 
 def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.Logger:
     """
-    Sets up the logger.
+    Sets up a logger
     
     Args:
         name: Logger name
@@ -48,11 +48,11 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
     # Prevent logs from propagating to the root logger to avoid duplicate output
     logger.propagate = False
     
-    # If handlers already exist, do not add again
+    # If handlers already exist, do not add them again
     if logger.handlers:
         return logger
     
-    # Log format
+    # Log formats
     detailed_formatter = logging.Formatter(
         '[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
@@ -74,8 +74,8 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(detailed_formatter)
     
-    # 2. Console handler - concise logs (INFO and above)
-    # Ensure UTF-8 encoding on Windows to avoid garbled Chinese characters
+    # 2. Console handler - simple logs (INFO and above)
+    # Ensure UTF-8 encoding on Windows to avoid encoding issues
     _ensure_utf8_stdout()
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
@@ -90,7 +90,7 @@ def setup_logger(name: str = 'mirofish', level: int = logging.DEBUG) -> logging.
 
 def get_logger(name: str = 'mirofish') -> logging.Logger:
     """
-    Gets the logger (creates if it doesn't exist).
+    Gets a logger (creates it if it doesn't exist)
     
     Args:
         name: Logger name
@@ -108,7 +108,7 @@ def get_logger(name: str = 'mirofish') -> logging.Logger:
 logger = setup_logger()
 
 
-# Convenient methods
+# Shortcut methods
 def debug(msg, *args, **kwargs):
     logger.debug(msg, *args, **kwargs)
 

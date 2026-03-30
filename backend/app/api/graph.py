@@ -1,6 +1,6 @@
 """
-Graph related API routes
-Uses project context mechanism for server-side persistent state
+Graph-related API Routes
+Uses project context mechanism, server-side persistent state.
 """
 
 import os
@@ -23,19 +23,19 @@ logger = get_logger('mirofish.api')
 
 
 def allowed_file(filename: str) -> bool:
-    """Check if file extension is allowed"""
+    """Checks if the file extension is allowed"""
     if not filename or '.' not in filename:
         return False
     ext = os.path.splitext(filename)[1].lower().lstrip('.')
     return ext in Config.ALLOWED_EXTENSIONS
 
 
-# ============== Project Management API ==============
+# ============== Project Management Interface ==============
 
 @graph_bp.route('/project/<project_id>', methods=['GET'])
 def get_project(project_id: str):
     """
-    Get project details
+    Gets project details
     """
     project = ProjectManager.get_project(project_id)
     
@@ -54,7 +54,7 @@ def get_project(project_id: str):
 @graph_bp.route('/project/list', methods=['GET'])
 def list_projects():
     """
-    List all projects
+    Lists all projects
     """
     limit = request.args.get('limit', 50, type=int)
     projects = ProjectManager.list_projects(limit=limit)
@@ -69,7 +69,7 @@ def list_projects():
 @graph_bp.route('/project/<project_id>', methods=['DELETE'])
 def delete_project(project_id: str):
     """
-    Delete project
+    Deletes project
     """
     success = ProjectManager.delete_project(project_id)
     
@@ -88,7 +88,7 @@ def delete_project(project_id: str):
 @graph_bp.route('/project/<project_id>/reset', methods=['POST'])
 def reset_project(project_id: str):
     """
-    Reset project status (for rebuilding graph)
+    Resets project status (for rebuilding the graph)
     """
     project = ProjectManager.get_project(project_id)
     
@@ -116,20 +116,20 @@ def reset_project(project_id: str):
     })
 
 
-# ============== Interface 1: Upload files and generate ontology ==============
+# ============== Interface 1: Upload Files and Generate Ontology ==============
 
 @graph_bp.route('/ontology/generate', methods=['POST'])
 def generate_ontology():
     """
     Interface 1: Upload files, analyze and generate ontology definition
     
-    Request method: multipart/form-data
+    Request: multipart/form-data
     
     Parameters:
         files: Uploaded files (PDF/MD/TXT), multiple allowed
         simulation_requirement: Simulation requirement description (required)
         project_name: Project name (optional)
-        additional_context: Additional explanation (optional)
+        additional_context: Extra explanation (optional)
         
     Returns:
         {
@@ -147,7 +147,7 @@ def generate_ontology():
         }
     """
     try:
-        logger.info("=== Starting ontology definition generation ===")
+        logger.info("=== Starting ontology generation ===")
         
         # Get parameters
         simulation_requirement = request.form.get('simulation_requirement', '')
@@ -160,7 +160,7 @@ def generate_ontology():
         if not simulation_requirement:
             return jsonify({
                 "success": False,
-                "error": "Please provide a simulation requirement description (simulation_requirement)"
+                "error": "Please provide simulation requirement description (simulation_requirement)"
             }), 400
         
         # Get uploaded files
@@ -197,16 +197,13 @@ def generate_ontology():
                 text = FileParser.extract_text(file_info["path"])
                 text = TextProcessor.preprocess_text(text)
                 document_texts.append(text)
-                all_text += f"
-
-=== {file_info['original_filename']} ===
-{text}"
+                all_text += f"\n\n=== {file_info['original_filename']} ===\n{text}"
         
         if not document_texts:
             ProjectManager.delete_project(project.project_id)
             return jsonify({
                 "success": False,
-                "error": "No documents successfully processed, please check file format"
+                "error": "No documents processed successfully, please check file formats"
             }), 400
         
         # Save extracted text
@@ -235,7 +232,7 @@ def generate_ontology():
         project.analysis_summary = ontology.get("analysis_summary", "")
         project.status = ProjectStatus.ONTOLOGY_GENERATED
         ProjectManager.save_project(project)
-        logger.info(f"=== Ontology generation complete === Project ID: {project.project_id}")
+        logger.info(f"=== Ontology generation finished === Project ID: {project.project_id}")
         
         return jsonify({
             "success": True,
@@ -257,7 +254,7 @@ def generate_ontology():
         }), 500
 
 
-# ============== Interface 2: Build graph ==============
+# ============== Interface 2: Build Graph ==============
 
 @graph_bp.route('/build', methods=['POST'])
 def build_graph():
@@ -267,7 +264,7 @@ def build_graph():
     Request (JSON):
         {
             "project_id": "proj_xxxx",  // Required, from Interface 1
-            "graph_name": "Graph Name",    // Optional
+            "graph_name": "Graph Name",  // Optional
             "chunk_size": 500,          // Optional, default 500
             "chunk_overlap": 50         // Optional, default 50
         }
@@ -283,23 +280,23 @@ def build_graph():
         }
     """
     try:
-        logger.info("=== Starting graph building ===")
+        logger.info("=== Starting graph build ===")
         
-        # Check configuration
+        # Check config
         errors = []
         if not Config.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY is not configured")
+            errors.append("ZEP_API_KEY not configured")
         if errors:
-            logger.error(f"Configuration error: {errors}")
+            logger.error(f"Config error: {errors}")
             return jsonify({
                 "success": False,
-                "error": "Configuration error: " + "; ".join(errors)
+                "error": "Config error: " + "; ".join(errors)
             }), 500
         
         # Parse request
         data = request.get_json() or {}
         project_id = data.get('project_id')
-        logger.debug(f"Request parameters: project_id={project_id}")
+        logger.debug(f"Request params: project_id={project_id}")
         
         if not project_id:
             return jsonify({
@@ -321,29 +318,29 @@ def build_graph():
         if project.status == ProjectStatus.CREATED:
             return jsonify({
                 "success": False,
-                "error": "Ontology has not been generated for the project yet, please call /ontology/generate first"
+                "error": "Project ontology not yet generated, please call /ontology/generate first"
             }), 400
         
         if project.status == ProjectStatus.GRAPH_BUILDING and not force:
             return jsonify({
                 "success": False,
-                "error": "Graph is already building, do not resubmit. To force rebuild, please add force: true",
+                "error": "Graph building in progress, do not resubmit. For forced rebuild, add force: true",
                 "task_id": project.graph_build_task_id
             }), 400
         
-        # If force rebuild, reset status
+        # Reset state if force rebuild
         if force and project.status in [ProjectStatus.GRAPH_BUILDING, ProjectStatus.FAILED, ProjectStatus.GRAPH_COMPLETED]:
             project.status = ProjectStatus.ONTOLOGY_GENERATED
             project.graph_id = None
             project.graph_build_task_id = None
             project.error = None
         
-        # Get configuration
+        # Get config
         graph_name = data.get('graph_name', project.name or 'MiroFish Graph')
         chunk_size = data.get('chunk_size', project.chunk_size or Config.DEFAULT_CHUNK_SIZE)
         chunk_overlap = data.get('chunk_overlap', project.chunk_overlap or Config.DEFAULT_CHUNK_OVERLAP)
         
-        # Update project configuration
+        # Update project config
         project.chunk_size = chunk_size
         project.chunk_overlap = chunk_overlap
         
@@ -352,7 +349,7 @@ def build_graph():
         if not text:
             return jsonify({
                 "success": False,
-                "error": "No extracted text content found"
+                "error": "Extracted text content not found"
             }), 400
         
         # Get ontology
@@ -360,12 +357,12 @@ def build_graph():
         if not ontology:
             return jsonify({
                 "success": False,
-                "error": "No ontology definition found"
+                "error": "Ontology definition not found"
             }), 400
         
-        # Create asynchronous task
+        # Create async task
         task_manager = TaskManager()
-        task_id = task_manager.create_task(f"Build graph: {graph_name}")
+        task_id = task_manager.create_task(f"Building graph: {graph_name}")
         logger.info(f"Created graph building task: task_id={task_id}, project_id={project_id}")
         
         # Update project status
@@ -377,14 +374,14 @@ def build_graph():
         def build_task():
             build_logger = get_logger('mirofish.build')
             try:
-                build_logger.info(f"[{task_id}] Starting graph building...")
+                build_logger.info(f"[{task_id}] Starting graph build...")
                 task_manager.update_task(
                     task_id, 
                     status=TaskStatus.PROCESSING,
                     message="Initializing graph building service..."
                 )
                 
-                # Create graph building service
+                # Create graph builder service
                 builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
                 
                 # Chunking
@@ -408,7 +405,7 @@ def build_graph():
                 )
                 graph_id = builder.create_graph(name=graph_name)
                 
-                # Update project's graph_id
+                # Update project graph_id
                 project.graph_id = graph_id
                 ProjectManager.save_project(project)
                 
@@ -420,7 +417,7 @@ def build_graph():
                 )
                 builder.set_ontology(graph_id, ontology)
                 
-                # Add text (progress_callback signature is (msg, progress_ratio))
+                # Add text
                 def add_progress_callback(msg, progress_ratio):
                     progress = 15 + int(progress_ratio * 40)  # 15% - 55%
                     task_manager.update_task(
@@ -442,7 +439,7 @@ def build_graph():
                     progress_callback=add_progress_callback
                 )
                 
-                # Wait for Zep to finish processing (query processed status of each episode)
+                # Wait for Zep processing
                 task_manager.update_task(
                     task_id,
                     message="Waiting for Zep to process data...",
@@ -462,7 +459,7 @@ def build_graph():
                 # Get graph data
                 task_manager.update_task(
                     task_id,
-                    message="Getting graph data...",
+                    message="Retrieving graph data...",
                     progress=95
                 )
                 graph_data = builder.get_graph_data(graph_id)
@@ -473,7 +470,7 @@ def build_graph():
                 
                 node_count = graph_data.get("node_count", 0)
                 edge_count = graph_data.get("edge_count", 0)
-                build_logger.info(f"[{task_id}] Graph building complete: graph_id={graph_id}, nodes={node_count}, edges={edge_count}")
+                build_logger.info(f"[{task_id}] Graph building complete: graph_id={graph_id}, Nodes={node_count}, Edges={edge_count}")
                 
                 # Complete
                 task_manager.update_task(
@@ -502,7 +499,7 @@ def build_graph():
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.FAILED,
-                    message=f"Build failed: {str(e)}",
+                    message=f"Building failed: {str(e)}",
                     error=traceback.format_exc()
                 )
         
@@ -527,12 +524,12 @@ def build_graph():
         }), 500
 
 
-# ============== Task Query API ==============
+# ============== Task Query Interface ==============
 
 @graph_bp.route('/task/<task_id>', methods=['GET'])
 def get_task(task_id: str):
     """
-    Query task status
+    Queries task status
     """
     task = TaskManager().get_task(task_id)
     
@@ -551,7 +548,7 @@ def get_task(task_id: str):
 @graph_bp.route('/tasks', methods=['GET'])
 def list_tasks():
     """
-    List all tasks
+    Lists all tasks
     """
     tasks = TaskManager().list_tasks()
     
@@ -562,18 +559,18 @@ def list_tasks():
     })
 
 
-# ============== Graph Data API ==============
+# ============== Graph Data Interface ==============
 
 @graph_bp.route('/data/<graph_id>', methods=['GET'])
 def get_graph_data(graph_id: str):
     """
-    Get graph data (nodes and edges)
+    Gets graph data (nodes and edges)
     """
     try:
         if not Config.ZEP_API_KEY:
             return jsonify({
                 "success": False,
-                "error": "ZEP_API_KEY is not configured"
+                "error": "ZEP_API_KEY not configured"
             }), 500
         
         builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
@@ -595,13 +592,13 @@ def get_graph_data(graph_id: str):
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
 def delete_graph(graph_id: str):
     """
-    Delete Zep graph
+    Deletes Zep graph
     """
     try:
         if not Config.ZEP_API_KEY:
             return jsonify({
                 "success": False,
-                "error": "ZEP_API_KEY is not configured"
+                "error": "ZEP_API_KEY not configured"
             }), 500
         
         builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)

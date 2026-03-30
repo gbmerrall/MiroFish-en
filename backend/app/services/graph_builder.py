@@ -1,9 +1,8 @@
 """
 Graph Building Service
-Interface 2: Build a Standalone Graph using the Zep API
+Interface 2: Build Standalone Graph using Zep API
 """
 
-import os
 import uuid
 import time
 import threading
@@ -39,13 +38,13 @@ class GraphInfo:
 class GraphBuilderService:
     """
     Graph Building Service
-    Responsible for calling the Zep API to build a knowledge graph
+    Responsible for calling Zep API to build knowledge graphs.
     """
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or Config.ZEP_API_KEY
         if not self.api_key:
-            raise ValueError("ZEP_API_KEY is not configured")
+            raise ValueError("ZEP_API_KEY not configured")
         
         self.client = Zep(api_key=self.api_key)
         self.task_manager = TaskManager()
@@ -60,15 +59,15 @@ class GraphBuilderService:
         batch_size: int = 3
     ) -> str:
         """
-        Builds a graph asynchronously
+        Asynchronously builds graph
         
         Args:
             text: Input text
-            ontology: Ontology definition (output from interface 1)
+            ontology: Ontology definition (from Interface 1 output)
             graph_name: Graph name
             chunk_size: Text chunk size
             chunk_overlap: Chunk overlap size
-            batch_size: Number of chunks to send per batch
+            batch_size: Number of chunks per batch
             
         Returns:
             Task ID
@@ -83,7 +82,7 @@ class GraphBuilderService:
             }
         )
         
-        # Execute build in a background thread
+        # Execute building in background thread
         thread = threading.Thread(
             target=self._build_graph_worker,
             args=(task_id, text, ontology, graph_name, chunk_size, chunk_overlap, batch_size)
@@ -109,7 +108,7 @@ class GraphBuilderService:
                 task_id,
                 status=TaskStatus.PROCESSING,
                 progress=5,
-                message="Starting to build graph..."
+                message="Starting graph build..."
             )
             
             # 1. Create graph
@@ -128,7 +127,7 @@ class GraphBuilderService:
                 message="Ontology set"
             )
             
-            # 3. Split text into chunks
+            # 3. Text chunking
             chunks = TextProcessor.split_text(text, chunk_size, chunk_overlap)
             total_chunks = len(chunks)
             self.task_manager.update_task(
@@ -137,7 +136,7 @@ class GraphBuilderService:
                 message=f"Text split into {total_chunks} chunks"
             )
             
-            # 4. Send data in batches
+            # 4. Add text batches
             episode_uuids = self.add_text_batches(
                 graph_id, chunks, batch_size,
                 lambda msg, prog: self.task_manager.update_task(
@@ -147,7 +146,7 @@ class GraphBuilderService:
                 )
             )
             
-            # 5. Wait for Zep to finish processing
+            # 5. Wait for Zep processing
             self.task_manager.update_task(
                 task_id,
                 progress=60,
@@ -163,11 +162,11 @@ class GraphBuilderService:
                 )
             )
             
-            # 6. Get graph information
+            # 6. Fetch graph info
             self.task_manager.update_task(
                 task_id,
                 progress=90,
-                message="Getting graph information..."
+                message="Fetching graph information..."
             )
             
             graph_info = self._get_graph_info(graph_id)
@@ -185,7 +184,7 @@ class GraphBuilderService:
             self.task_manager.fail_task(task_id, error_msg)
     
     def create_graph(self, name: str) -> str:
-        """Creates a Zep graph (public method)"""
+        """Creates Zep graph (Public method)"""
         graph_id = f"mirofish_{uuid.uuid4().hex[:16]}"
         
         self.client.graph.create(
@@ -197,21 +196,21 @@ class GraphBuilderService:
         return graph_id
     
     def set_ontology(self, graph_id: str, ontology: Dict[str, Any]):
-        """Sets the graph ontology (public method)"""
+        """Sets graph ontology (Public method)"""
         import warnings
         from typing import Optional
         from pydantic import Field
         from zep_cloud.external_clients.ontology import EntityModel, EntityText, EdgeModel
         
-        # Suppress Pydantic v2 warning about Field(default=None)
-        # This is required by the Zep SDK, the warning comes from dynamic class creation and can be safely ignored
+        # Suppress Pydantic v2 warnings about Field(default=None)
+        # This is the required usage for Zep SDK, warnings come from dynamic class creation
         warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
         
         # Zep reserved names, cannot be used as attribute names
         RESERVED_NAMES = {'uuid', 'name', 'group_id', 'name_embedding', 'summary', 'created_at'}
         
         def safe_attr_name(attr_name: str) -> str:
-            """Converts reserved names to safe names"""
+            """Converts reserved name to safe name"""
             if attr_name.lower() in RESERVED_NAMES:
                 return f"entity_{attr_name}"
             return attr_name
@@ -222,16 +221,16 @@ class GraphBuilderService:
             name = entity_def["name"]
             description = entity_def.get("description", f"A {name} entity.")
             
-            # Create attribute dictionary and type annotations (required for Pydantic v2)
+            # Create attribute dict and type annotations (Pydantic v2 required)
             attrs = {"__doc__": description}
             annotations = {}
             
             for attr_def in entity_def.get("attributes", []):
-                attr_name = safe_attr_name(attr_def["name"])  # Use safe name
+                attr_name = safe_attr_name(attr_def["name"])
                 attr_desc = attr_def.get("description", attr_name)
-                # Zep API requires Field's description, this is necessary
+                # Zep API requires Field description
                 attrs[attr_name] = Field(description=attr_desc, default=None)
-                annotations[attr_name] = Optional[EntityText]  # Type annotation
+                annotations[attr_name] = Optional[EntityText]
             
             attrs["__annotations__"] = annotations
             
@@ -246,16 +245,15 @@ class GraphBuilderService:
             name = edge_def["name"]
             description = edge_def.get("description", f"A {name} relationship.")
             
-            # Create attribute dictionary and type annotations
+            # Create attribute dict and type annotations
             attrs = {"__doc__": description}
             annotations = {}
             
             for attr_def in edge_def.get("attributes", []):
-                attr_name = safe_attr_name(attr_def["name"])  # Use safe name
+                attr_name = safe_attr_name(attr_def["name"])
                 attr_desc = attr_def.get("description", attr_name)
-                # Zep API requires Field's description, this is necessary
                 attrs[attr_name] = Field(description=attr_desc, default=None)
-                annotations[attr_name] = Optional[str]  # Edge attributes use str type
+                annotations[attr_name] = Optional[str]
             
             attrs["__annotations__"] = annotations
             
@@ -292,7 +290,7 @@ class GraphBuilderService:
         batch_size: int = 3,
         progress_callback: Optional[Callable] = None
     ) -> List[str]:
-        """Adds text to the graph in batches, returns a list of all episode uuids"""
+        """Adds text batches to graph, returns list of all episode UUIDs"""
         episode_uuids = []
         total_chunks = len(chunks)
         
@@ -321,19 +319,19 @@ class GraphBuilderService:
                     episodes=episodes
                 )
                 
-                # Collect returned episode uuids
+                # Collect returned episode UUIDs
                 if batch_result and isinstance(batch_result, list):
                     for ep in batch_result:
                         ep_uuid = getattr(ep, 'uuid_', None) or getattr(ep, 'uuid', None)
                         if ep_uuid:
                             episode_uuids.append(ep_uuid)
                 
-                # Avoid sending requests too quickly
+                # Rate limiting delay
                 time.sleep(1)
                 
             except Exception as e:
                 if progress_callback:
-                    progress_callback(f"Batch {batch_num} failed to send: {str(e)}", 0)
+                    progress_callback(f"Batch {batch_num} failed: {str(e)}", 0)
                 raise
         
         return episode_uuids
@@ -344,10 +342,10 @@ class GraphBuilderService:
         progress_callback: Optional[Callable] = None,
         timeout: int = 600
     ):
-        """Waits for all episodes to finish processing (by querying the processed status of each episode)"""
+        """Waits for all episodes to be processed"""
         if not episode_uuids:
             if progress_callback:
-                progress_callback("No need to wait (no episodes)", 1.0)
+                progress_callback("Nothing to wait for (no episodes)", 1.0)
             return
         
         start_time = time.time()
@@ -356,18 +354,18 @@ class GraphBuilderService:
         total_episodes = len(episode_uuids)
         
         if progress_callback:
-            progress_callback(f"Starting to wait for {total_episodes} text chunks to be processed...", 0)
+            progress_callback(f"Starting to wait for {total_episodes} chunks to process...", 0)
         
         while pending_episodes:
             if time.time() - start_time > timeout:
                 if progress_callback:
                     progress_callback(
-                        f"Some text chunks timed out, {completed_count}/{total_episodes} completed",
+                        f"Some chunks timed out, completed {completed_count}/{total_episodes}",
                         completed_count / total_episodes
                     )
                 break
             
-            # Check the processing status of each episode
+            # Check status of each episode
             for ep_uuid in list(pending_episodes):
                 try:
                     episode = self.client.graph.episode.get(uuid_=ep_uuid)
@@ -377,25 +375,25 @@ class GraphBuilderService:
                         pending_episodes.remove(ep_uuid)
                         completed_count += 1
                         
-                except Exception as e:
-                    # Ignore individual query errors and continue
+                except Exception:
+                    # Ignore single query errors
                     pass
             
             elapsed = int(time.time() - start_time)
             if progress_callback:
                 progress_callback(
-                    f"Zep processing... {completed_count}/{total_episodes} complete, {len(pending_episodes)} pending ({elapsed}s)",
+                    f"Zep processing... {completed_count}/{total_episodes} completed, {len(pending_episodes)} pending ({elapsed}s)",
                     completed_count / total_episodes if total_episodes > 0 else 0
                 )
             
             if pending_episodes:
-                time.sleep(3)  # Check every 3 seconds
+                time.sleep(3)
         
         if progress_callback:
             progress_callback(f"Processing complete: {completed_count}/{total_episodes}", 1.0)
     
     def _get_graph_info(self, graph_id: str) -> GraphInfo:
-        """Gets graph information"""
+        """Fetches graph information"""
         # Get nodes (paginated)
         nodes = fetch_all_nodes(self.client, graph_id)
 
@@ -419,25 +417,24 @@ class GraphBuilderService:
     
     def get_graph_data(self, graph_id: str) -> Dict[str, Any]:
         """
-        Gets full graph data (including detailed information)
+        Gets complete graph data (including detailed info)
         
         Args:
             graph_id: Graph ID
             
         Returns:
-            A dictionary containing nodes and edges, including detailed data like time information, attributes, etc.
+            Dict containing nodes and edges with temporal info, attributes, etc.
         """
         nodes = fetch_all_nodes(self.client, graph_id)
         edges = fetch_all_edges(self.client, graph_id)
 
-        # Create a node map to get node names
+        # Node mapping for name lookup
         node_map = {}
         for node in nodes:
             node_map[node.uuid_] = node.name or ""
         
         nodes_data = []
         for node in nodes:
-            # Get creation time
             created_at = getattr(node, 'created_at', None)
             if created_at:
                 created_at = str(created_at)
@@ -453,20 +450,17 @@ class GraphBuilderService:
         
         edges_data = []
         for edge in edges:
-            # Get time information
             created_at = getattr(edge, 'created_at', None)
             valid_at = getattr(edge, 'valid_at', None)
             invalid_at = getattr(edge, 'invalid_at', None)
             expired_at = getattr(edge, 'expired_at', None)
             
-            # Get episodes
             episodes = getattr(edge, 'episodes', None) or getattr(edge, 'episode_ids', None)
             if episodes and not isinstance(episodes, list):
                 episodes = [str(episodes)]
             elif episodes:
                 episodes = [str(e) for e in episodes]
             
-            # Get fact_type
             fact_type = getattr(edge, 'fact_type', None) or edge.name or ""
             
             edges_data.append({
@@ -495,6 +489,5 @@ class GraphBuilderService:
         }
     
     def delete_graph(self, graph_id: str):
-        """Deletes a graph"""
+        """Deletes graph"""
         self.client.graph.delete(graph_id=graph_id)
-

@@ -1,22 +1,21 @@
 """
-File Parsing Tools
+File Parsing Utility
 Supports text extraction from PDF, Markdown, and TXT files.
 """
 
-import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 def _read_text_with_fallback(file_path: str) -> str:
     """
-    Reads a text file, automatically detecting encoding if UTF-8 fails.
+    Reads text file, automatically detects encoding if UTF-8 fails.
     
-    Uses a multi-level fallback strategy:
-    1. First tries UTF-8 decoding
-    2. Uses charset_normalizer to detect encoding
-    3. Falls back to chardet to detect encoding
-    4. Finally uses UTF-8 + errors='replace' as a last resort
+    Uses a multi-stage fallback strategy:
+    1. First attempt UTF-8 decoding.
+    2. Use charset_normalizer to detect encoding.
+    3. Fall back to chardet for encoding detection.
+    4. Finally use UTF-8 + errors='replace' as fallback.
     
     Args:
         file_path: File path
@@ -26,13 +25,13 @@ def _read_text_with_fallback(file_path: str) -> str:
     """
     data = Path(file_path).read_bytes()
     
-    # First try UTF-8
+    # First attempt UTF-8
     try:
         return data.decode('utf-8')
     except UnicodeDecodeError:
         pass
     
-    # Try to use charset_normalizer to detect encoding
+    # Attempt using charset_normalizer for encoding detection
     encoding = None
     try:
         from charset_normalizer import from_bytes
@@ -42,7 +41,7 @@ def _read_text_with_fallback(file_path: str) -> str:
     except Exception:
         pass
     
-    # Fallback to chardet
+    # Fall back to chardet
     if not encoding:
         try:
             import chardet
@@ -66,7 +65,7 @@ class FileParser:
     @classmethod
     def extract_text(cls, file_path: str) -> str:
         """
-        Extracts text from a file.
+        Extracts text from file
         
         Args:
             file_path: File path
@@ -99,7 +98,7 @@ class FileParser:
         try:
             import fitz  # PyMuPDF
         except ImportError:
-            raise ImportError("PyMuPDF is required: pip install PyMuPDF")
+            raise ImportError("PyMuPDF needs to be installed: pip install PyMuPDF")
         
         text_parts = []
         with fitz.open(file_path) as doc:
@@ -108,24 +107,22 @@ class FileParser:
                 if text.strip():
                     text_parts.append(text)
         
-        return "
-
-".join(text_parts)
+        return "\n\n".join(text_parts)
     
     @staticmethod
     def _extract_from_md(file_path: str) -> str:
-        """Extracts text from Markdown, supports auto-encoding detection"""
+        """Extracts text from Markdown, supporting automatic encoding detection"""
         return _read_text_with_fallback(file_path)
     
     @staticmethod
     def _extract_from_txt(file_path: str) -> str:
-        """Extracts text from TXT, supports auto-encoding detection"""
+        """Extracts text from TXT, supporting automatic encoding detection"""
         return _read_text_with_fallback(file_path)
     
     @classmethod
     def extract_from_multiple(cls, file_paths: List[str]) -> str:
         """
-        Extracts text from multiple files and merges them.
+        Extracts text from multiple files and merges them
         
         Args:
             file_paths: List of file paths
@@ -139,14 +136,11 @@ class FileParser:
             try:
                 text = cls.extract_text(file_path)
                 filename = Path(file_path).name
-                all_texts.append(f"=== Document {i}: {filename} ===
-{text}")
+                all_texts.append(f"=== Document {i}: {filename} ===\n{text}")
             except Exception as e:
                 all_texts.append(f"=== Document {i}: {file_path} (Extraction failed: {str(e)}) ===")
         
-        return "
-
-".join(all_texts)
+        return "\n\n".join(all_texts)
 
 
 def split_text_into_chunks(
@@ -155,7 +149,7 @@ def split_text_into_chunks(
     overlap: int = 50
 ) -> List[str]:
     """
-    Splits text into chunks.
+    Splits text into small chunks
     
     Args:
         text: Original text
@@ -177,12 +171,7 @@ def split_text_into_chunks(
         # Try to split at sentence boundaries
         if end < len(text):
             # Find the nearest sentence terminator
-            for sep in ['.', '!', '?', '.
-', '!
-', '?
-', '
-
-', '. ', '! ', '? ']:
+            for sep in ['.\n', '!\n', '?\n', '\n\n', '. ', '! ', '? ', '。', '！', '？']:
                 last_sep = text[start:end].rfind(sep)
                 if last_sep != -1 and last_sep > chunk_size * 0.3:
                     end = start + last_sep + len(sep)
@@ -192,7 +181,7 @@ def split_text_into_chunks(
         if chunk:
             chunks.append(chunk)
         
-        # Next chunk starts from the overlap position
+        # Next chunk starts from overlapping position
         start = end - overlap if end < len(text) else len(text)
     
     return chunks

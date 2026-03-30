@@ -1,51 +1,50 @@
 """
 Ontology Generation Service
-Interface 1: Analyzes text content to generate entity and relationship type definitions suitable for social simulation.
+Interface 1: Analyzes text content and generates entity and relationship type definitions suitable for social simulation.
 """
 
-import json
 from typing import Dict, Any, List, Optional
 from ..utils.llm_client import LLMClient
 
 
+# System prompt for ontology generation
+ONTOLOGY_SYSTEM_PROMPT = """You are a professional knowledge graph ontology design expert. Your task is to analyze given text content and simulation requirements to design entity and relationship types suitable for **social media public opinion simulation**.
 
-ONTOLOGY_SYSTEM_PROMPT = """You are an expert in knowledge graph ontology design. Your task is to analyze the given text content and simulation requirements, and design entity types and relationship types suitable for **social media public opinion simulation**.
-
-**Important: You must output valid JSON format data and nothing else.**
+**IMPORTANT: You must output valid JSON format data. Do not output any other content.**
 
 ## Core Task Background
 
 We are building a **social media public opinion simulation system**. In this system:
-- Each entity is an "account" or "subject" that can speak, interact, and disseminate information on social media.
-- Entities will influence, forward, comment on, and respond to each other.
-- We need to simulate the reactions of all parties and the information dissemination paths in a public opinion event.
+- Each entity is an "account" or "subject" that can voice opinions, interact, and spread information on social media.
+- Entities will influence each other, repost, comment, and respond.
+- We need to simulate the reactions of all parties and the path of information dissemination in public opinion events.
 
-Therefore, **entities must be real-world subjects that can speak and interact on social media**:
+Therefore, **entities must be subjects that exist in reality and can voice opinions and interact on social media**:
 
-**Can be**:
-- Specific individuals (public figures, parties involved, opinion leaders, experts, ordinary people)
+**CAN BE**:
+- Specific individuals (public figures, parties involved, opinion leaders, experts/scholars, ordinary people)
 - Companies, enterprises (including their official accounts)
-- Organizations (universities, associations, NGOs, unions, etc.)
+- Organizations (universities, associations, NGOs, trade unions, etc.)
 - Government departments, regulatory agencies
 - Media organizations (newspapers, TV stations, self-media, websites)
 - Social media platforms themselves
-- Representatives of specific groups (such as alumni associations, fan groups, rights protection groups, etc.)
+- Representatives of specific groups (e.g., alumni associations, fan clubs, rights groups, etc.)
 
-**Cannot be**:
+**CANNOT BE**:
 - Abstract concepts (e.g., "public opinion", "emotion", "trend")
-- Themes/topics (e.g., "academic integrity", "education reform")
-- Viewpoints/attitudes (e.g., "supporters", "opponents")
+- Themes/Topics (e.g., "academic integrity", "education reform")
+- Viewpoints/Attitudes (e.g., "supporters", "opponents")
 
 ## Output Format
 
-Please output in JSON format, containing the following structure:
+Please output in JSON format with the following structure:
 
 ```json
 {
     "entity_types": [
         {
             "name": "Entity type name (English, PascalCase)",
-            "description": "Short description (English, no more than 100 characters)",
+            "description": "Short description (English, max 100 characters)",
             "attributes": [
                 {
                     "name": "Attribute name (English, snake_case)",
@@ -59,72 +58,72 @@ Please output in JSON format, containing the following structure:
     "edge_types": [
         {
             "name": "Relationship type name (English, UPPER_SNAKE_CASE)",
-            "description": "Short description (English, no more than 100 characters)",
+            "description": "Short description (English, max 100 characters)",
             "source_targets": [
                 {"source": "Source entity type", "target": "Target entity type"}
             ],
             "attributes": []
         }
     ],
-    "analysis_summary": "A brief analysis of the text content (Chinese)"
+    "analysis_summary": "Brief analysis description of the text content (English)"
 }
 ```
 
-## Design Guidelines (Extremely Important!)
+## Design Guidelines (EXTREMELY IMPORTANT!)
 
-### 1. Entity Type Design - Must be strictly followed
+### 1. Entity Type Design - Must strictly comply
 
-**Quantity requirement: Must be exactly 10 entity types**
+**Quantity Requirement: Must have EXACTLY 10 entity types**
 
-**Hierarchy requirement (must include both specific types and fallback types)**:
+**Hierarchy Requirement (Must include both specific and fallback types)**:
 
 Your 10 entity types must include the following hierarchy:
 
-A. **Fallback types (must be included, placed at the end of the list)**:
-   - `Person`: A fallback type for any natural person. When a person does not belong to other more specific person types, they are classified into this category.
-   - `Organization`: A fallback type for any organization. When an organization does not belong to other more specific organization types, it is classified into this category.
+A. **Fallback Types (Must be included, place as the last 2 in the list)**:
+   - `Person`: Fallback type for any individual human. Used when a person doesn't fit into other more specific person types.
+   - `Organization`: Fallback type for any organization. Used when an organization doesn't fit into other more specific organization types.
 
-B. **Specific types (8 types, designed based on the text content)**:
-   - Design more specific types for the main roles that appear in the text.
-   - For example: if the text involves an academic event, there can be `Student`, `Professor`, `University`.
-   - For example: if the text involves a commercial event, there can be `Company`, `CEO`, `Employee`.
+B. **Specific Types (8 types, designed based on text content)**:
+   - Design more specific types for the main characters appearing in the text.
+   - Example: If the text involves academic events, you could have `Student`, `Professor`, `University`.
+   - Example: If the text involves business events, you could have `Company`, `CEO`, `Employee`.
 
-**Why are fallback types needed**:
-- Various characters will appear in the text, such as "primary and secondary school teachers", "passerby A", "a certain netizen".
-- If there is no specific type to match, they should be classified as `Person`.
-- Similarly, small organizations, temporary groups, etc. should be classified as `Organization`.
+**Why fallback types are needed**:
+- Various people like "primary school teacher", "passerby A", "a certain netizen" will appear in the text.
+- If there's no specific type match, they should be grouped into `Person`.
+- Similarly, small organizations, temporary groups, etc., should be grouped into `Organization`.
 
 **Principles for designing specific types**:
-- Identify high-frequency or key role types from the text.
+- Identify high-frequency or key character types from the text.
 - Each specific type should have clear boundaries to avoid overlap.
-- The description must clearly explain the difference between this type and the fallback type.
+- Description must clearly state the difference between this type and fallback types.
 
 ### 2. Relationship Type Design
 
-- Quantity: 6-10
+- Quantity: 6-10 types.
 - Relationships should reflect real connections in social media interactions.
-- Ensure that the source_targets of the relationships cover the entity types you define.
+- Ensure relationship source_targets cover your defined entity types.
 
 ### 3. Attribute Design
 
 - 1-3 key attributes for each entity type.
-- **Note**: Attribute names cannot be `name`, `uuid`, `group_id`, `created_at`, `summary` (these are system reserved words).
-- Recommended to use: `full_name`, `title`, `role`, `position`, `location`, `description`, etc.
+- **Note**: Attribute names cannot use `name`, `uuid`, `group_id`, `created_at`, `summary` (these are system reserved words).
+- Recommended use: `full_name`, `title`, `role`, `position`, `location`, `description`, etc.
 
 ## Entity Type Reference
 
 **Individual (Specific)**:
 - Student
-- Professor/Scholar
+- Professor
 - Journalist
-- Celebrity/Influencer
+- Celebrity
 - Executive
 - Official
 - Lawyer
 - Doctor
 
 **Individual (Fallback)**:
-- Person: Any natural person (used when not belonging to the above specific types)
+- Person: Any individual person (used when not belonging to specific types above)
 
 **Organization (Specific)**:
 - University
@@ -136,7 +135,7 @@ B. **Specific types (8 types, designed based on the text content)**:
 - NGO
 
 **Organization (Fallback)**:
-- Organization: Any organization (used when not belonging to the above specific types)
+- Organization: Any organization (used when not belonging to specific types above)
 
 ## Relationship Type Reference
 
@@ -158,7 +157,7 @@ B. **Specific types (8 types, designed based on the text content)**:
 class OntologyGenerator:
     """
     Ontology Generator
-    Analyzes text content to generate entity and relationship type definitions.
+    Analyzes text content and generates entity and relationship type definitions.
     """
     
     def __init__(self, llm_client: Optional[LLMClient] = None):
@@ -171,15 +170,15 @@ class OntologyGenerator:
         additional_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Generates an ontology definition.
+        Generates ontology definition
         
         Args:
-            document_texts: List of document texts.
-            simulation_requirement: Description of the simulation requirement.
-            additional_context: Additional context.
+            document_texts: List of document texts
+            simulation_requirement: Description of simulation requirements
+            additional_context: Extra context
             
         Returns:
-            Ontology definition (entity_types, edge_types, etc.).
+            Ontology definition (entity_types, edge_types, etc.)
         """
         # Build user message
         user_message = self._build_user_message(
@@ -200,12 +199,12 @@ class OntologyGenerator:
             max_tokens=4096
         )
         
-        # Validate and post-process
+        # Validation and post-processing
         result = self._validate_and_process(result)
         
         return result
     
-    # Maximum text length to pass to the LLM (50,000 characters)
+    # Maximum text length passed to LLM (50,000 characters)
     MAX_TEXT_LENGTH_FOR_LLM = 50000
     
     def _build_user_message(
@@ -214,18 +213,18 @@ class OntologyGenerator:
         simulation_requirement: str,
         additional_context: Optional[str]
     ) -> str:
-        """Builds the user message."""
+        """Builds user message"""
         
-        # Combine texts
+        # Merge texts
         combined_text = "\n\n---\n\n".join(document_texts)
         original_length = len(combined_text)
         
-        # Truncate if the text exceeds 50,000 characters (only affects the content passed to the LLM, not the graph construction)
+        # Truncate if text exceeds 50,000 chars (only affects what is passed to LLM, not graph construction)
         if len(combined_text) > self.MAX_TEXT_LENGTH_FOR_LLM:
             combined_text = combined_text[:self.MAX_TEXT_LENGTH_FOR_LLM]
-            combined_text += f"\n\n...(Original text has {original_length} characters, the first {self.MAX_TEXT_LENGTH_FOR_LLM} characters have been extracted for ontology analysis)..."
+            combined_text += f"\n\n...(Original text {original_length} chars, truncated to first {self.MAX_TEXT_LENGTH_FOR_LLM} chars for ontology analysis)..."
         
-        message = f"""## Simulation Requirement
+        message = f"""## Simulation Requirements
 
 {simulation_requirement}
 
@@ -236,28 +235,28 @@ class OntologyGenerator:
         
         if additional_context:
             message += f"""
-## Additional Information
+## Additional Explanation
 
 {additional_context}
 """
         
         message += """
-Please design entity types and relationship types suitable for social media public opinion simulation based on the above content.
+Please design entity types and relationship types suitable for social media simulation based on the content above.
 
-**Rules to follow**:
-1. You must output exactly 10 entity types.
-2. The last 2 must be fallback types: Person (for individuals) and Organization (for organizations).
+**Rules that MUST be followed**:
+1. Must output EXACTLY 10 entity types.
+2. The last 2 must be fallback types: Person and Organization.
 3. The first 8 are specific types designed based on the text content.
-4. All entity types must be real-world subjects that can express opinions, not abstract concepts.
-5. Attribute names cannot be reserved words like name, uuid, group_id, etc. Use alternatives like full_name, org_name, etc.
+4. All entity types must be subjects that can voice opinions in reality, not abstract concepts.
+5. Attribute names cannot use reserved words like name, uuid, group_id; use full_name, org_name, etc., instead.
 """
         
         return message
     
     def _validate_and_process(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Validates and post-processes the result."""
+        """Validates and post-processes the result"""
         
-        # Ensure necessary fields exist
+        # Ensure required fields exist
         if "entity_types" not in result:
             result["entity_types"] = []
         if "edge_types" not in result:
@@ -271,7 +270,7 @@ Please design entity types and relationship types suitable for social media publ
                 entity["attributes"] = []
             if "examples" not in entity:
                 entity["examples"] = []
-            # Ensure description does not exceed 100 characters
+            # Ensure description doesn't exceed 100 characters
             if len(entity.get("description", "")) > 100:
                 entity["description"] = entity["description"][:97] + "..."
         
@@ -314,7 +313,7 @@ Please design entity types and relationship types suitable for social media publ
         has_person = "Person" in entity_names
         has_organization = "Organization" in entity_names
         
-        # Fallback types to add
+        # Fallbacks to add
         fallbacks_to_add = []
         if not has_person:
             fallbacks_to_add.append(person_fallback)
@@ -325,17 +324,17 @@ Please design entity types and relationship types suitable for social media publ
             current_count = len(result["entity_types"])
             needed_slots = len(fallbacks_to_add)
             
-            # If adding will exceed 10, remove some existing types
+            # If addition exceeds 10, remove some existing types
             if current_count + needed_slots > MAX_ENTITY_TYPES:
                 # Calculate how many to remove
                 to_remove = current_count + needed_slots - MAX_ENTITY_TYPES
-                # Remove from the end (to keep the more important specific types at the front)
+                # Remove from end (preserving more important specific types at the beginning)
                 result["entity_types"] = result["entity_types"][:-to_remove]
             
             # Add fallback types
             result["entity_types"].extend(fallbacks_to_add)
         
-        # Finally, ensure limits are not exceeded (defensive programming)
+        # Final check to ensure count doesn't exceed limits (defensive programming)
         if len(result["entity_types"]) > MAX_ENTITY_TYPES:
             result["entity_types"] = result["entity_types"][:MAX_ENTITY_TYPES]
         
@@ -349,15 +348,15 @@ Please design entity types and relationship types suitable for social media publ
         Converts ontology definition to Python code (similar to ontology.py).
         
         Args:
-            ontology: Ontology definition.
+            ontology: Ontology definition
             
         Returns:
-            Python code string.
+            Python code string
         """
         code_lines = [
             '"""',
-            'Custom entity type definitions',
-            'Automatically generated by MiroFish for social public opinion simulation',
+            'Custom Entity Type Definitions',
+            'Automatically generated by MiroFish for social media simulation.',
             '"""',
             '',
             'from pydantic import Field',
@@ -383,8 +382,8 @@ Please design entity types and relationship types suitable for social media publ
                     attr_desc = attr.get("description", attr_name)
                     code_lines.append(f'    {attr_name}: EntityText = Field(')
                     code_lines.append(f'        description="{attr_desc}",')
-                    code_lines.append(f'        default=None')
-                    code_lines.append(f'    )')
+                    code_lines.append('        default=None')
+                    code_lines.append('    )')
             else:
                 code_lines.append('    pass')
             
@@ -411,8 +410,8 @@ Please design entity types and relationship types suitable for social media publ
                     attr_desc = attr.get("description", attr_name)
                     code_lines.append(f'    {attr_name}: EntityText = Field(')
                     code_lines.append(f'        description="{attr_desc}",')
-                    code_lines.append(f'        default=None')
-                    code_lines.append(f'    )')
+                    code_lines.append('        default=None')
+                    code_lines.append('    )')
             else:
                 code_lines.append('    pass')
             
@@ -420,7 +419,7 @@ Please design entity types and relationship types suitable for social media publ
             code_lines.append('')
         
         # Generate type dictionaries
-        code_lines.append('# ============== Type Configurations ==============')
+        code_lines.append('# ============== Type Configuration ==============')
         code_lines.append('')
         code_lines.append('ENTITY_TYPES = {')
         for entity in ontology.get("entity_types", []):
@@ -450,4 +449,3 @@ Please design entity types and relationship types suitable for social media publ
         code_lines.append('}')
         
         return '\n'.join(code_lines)
-

@@ -1,8 +1,8 @@
 """
-Test if the generated Profile format meets the OASIS requirements.
+Test if Profile format generation complies with OASIS requirements.
 Validation:
-1. Twitter Profile generates in CSV format.
-2. Reddit Profile generates in detailed JSON format.
+1. Twitter Profile generation in CSV format.
+2. Reddit Profile generation in detailed JSON format.
 """
 
 import os
@@ -18,12 +18,12 @@ from app.services.oasis_profile_generator import OasisProfileGenerator, OasisAge
 
 
 def test_profile_formats():
-    """Test Profile Formats"""
+    """Test Profile formats"""
     print("=" * 60)
     print("OASIS Profile Format Test")
     print("=" * 60)
     
-    # Create test profile data
+    # Create test Profile data
     test_profiles = [
         OasisAgentProfile(
             user_id=0,
@@ -63,7 +63,7 @@ def test_profile_formats():
     
     generator = OasisProfileGenerator.__new__(OasisProfileGenerator)
     
-    # Use a temporary directory
+    # Use temporary directory
     with tempfile.TemporaryDirectory() as temp_dir:
         twitter_path = os.path.join(temp_dir, "twitter_profiles.csv")
         reddit_path = os.path.join(temp_dir, "reddit_profiles.json")
@@ -73,62 +73,62 @@ def test_profile_formats():
         print("-" * 40)
         generator._save_twitter_csv(test_profiles, twitter_path)
         
-        # Read and validate CSV
+        # Read and verify CSV
         with open(twitter_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             
         print(f"   File: {twitter_path}")
         print(f"   Rows: {len(rows)}")
-        print(f"   Headers: {list(rows[0].keys())}")
-        print(f"\n   Sample data (row 1):")
+        print(f"   Header: {list(rows[0].keys())}")
+        print("\n   Example data (row 1):")
         for key, value in rows[0].items():
             print(f"     {key}: {value}")
         
-        # Validate required fields
+        # Verify required fields
         required_twitter_fields = ['user_id', 'user_name', 'name', 'bio', 
                                    'friend_count', 'follower_count', 'statuses_count', 'created_at']
         missing = set(required_twitter_fields) - set(rows[0].keys())
         if missing:
-            print(f"\n   [ERROR] Missing fields: {missing}")
+            print(f"\n   [Error] Missing fields: {missing}")
         else:
-            print(f"\n   [PASS] All required fields are present")
+            print("\n   [Pass] All required fields are present")
         
         # Test Reddit JSON format
-        print("\n2. Test Reddit Profile (detailed JSON format)")
+        print("\n2. Test Reddit Profile (Detailed JSON format)")
         print("-" * 40)
         generator._save_reddit_json(test_profiles, reddit_path)
         
-        # Read and validate JSON
+        # Read and verify JSON
         with open(reddit_path, 'r', encoding='utf-8') as f:
             reddit_data = json.load(f)
         
         print(f"   File: {reddit_path}")
-        print(f"   Entries: {len(reddit_data)}")
+        print(f"   Items: {len(reddit_data)}")
         print(f"   Fields: {list(reddit_data[0].keys())}")
-        print(f"\n   Sample data (entry 1):")
+        print("\n   Example data (item 1):")
         print(json.dumps(reddit_data[0], ensure_ascii=False, indent=4))
         
-        # Validate detailed format fields
+        # Verify detailed format fields
         required_reddit_fields = ['realname', 'username', 'bio', 'persona']
         optional_reddit_fields = ['age', 'gender', 'mbti', 'country', 'profession', 'interested_topics']
         
         missing = set(required_reddit_fields) - set(reddit_data[0].keys())
         if missing:
-            print(f"\n   [ERROR] Missing required fields: {missing}")
+            print(f"\n   [Error] Missing required fields: {missing}")
         else:
-            print(f"\n   [PASS] All required fields are present")
+            print("\n   [Pass] All required fields are present")
         
         present_optional = set(optional_reddit_fields) & set(reddit_data[0].keys())
-        print(f"   [INFO] Optional fields present: {present_optional}")
+        print(f"   [Info] Optional fields: {present_optional}")
     
     print("\n" + "=" * 60)
-    print("Test complete!")
+    print("Test Complete!")
     print("=" * 60)
 
 
 def show_expected_formats():
-    """Show expected OASIS formats"""
+    """Show OASIS expected formats"""
     print("\n" + "=" * 60)
     print("OASIS Expected Profile Format Reference")
     print("=" * 60)
@@ -140,7 +140,7 @@ def show_expected_formats():
 1,user1,User One,Tech enthusiast and coffee lover.,200,250,1000,2023-01-02"""
     print(twitter_example)
     
-    print("\n2. Reddit Profile (detailed JSON format)")
+    print("\n2. Reddit Profile (Detailed JSON format)")
     print("-" * 40)
     reddit_example = [
         {
@@ -162,5 +162,3 @@ def show_expected_formats():
 if __name__ == "__main__":
     test_profile_formats()
     show_expected_formats()
-
-

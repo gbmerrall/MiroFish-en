@@ -1,12 +1,13 @@
 """
-Simulation Configuration Intelligent Generator
-Uses LLM to automatically generate detailed simulation parameters based on simulation requirements, document content, and graph information.
-Achieves full automation without manual parameter settings.
+Simulation Configuration Smart Generator
+Uses LLM to automatically generate detailed simulation parameters based on simulation requirements, 
+document content, and graph information.
+Achieves full automation without manual parameter setting.
 
-Adopts a step-by-step generation strategy to avoid failure due to generating overly long content at once:
+Uses a step-by-step generation strategy to avoid failure due to excessively long content generation:
 1. Generate time configuration
 2. Generate event configuration
-3. Generate Agent configuration in batches
+3. Generate Agent configurations in batches
 4. Generate platform configuration
 """
 
@@ -20,27 +21,27 @@ from openai import OpenAI
 
 from ..config import Config
 from ..utils.logger import get_logger
-from .zep_entity_reader import EntityNode, ZepEntityReader
+from .zep_entity_reader import EntityNode
 
 logger = get_logger('mirofish.simulation_config')
 
-# China timezone configuration (Beijing time)
-CHINA_TIMEZONE_CONFIG = {
-    # Deep night hours (almost no activity)
+# Daily routine configuration (Beijing Time)
+DAILY_ROUTINE_CONFIG = {
+    # Late night period (Almost no activity)
     "dead_hours": [0, 1, 2, 3, 4, 5],
-    # Morning hours (gradually waking up)
+    # Morning period (Gradually waking up)
     "morning_hours": [6, 7, 8],
-    # Work hours
+    # Working period
     "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    # Evening peak (most active)
+    # Evening peak (Most active)
     "peak_hours": [19, 20, 21, 22],
-    # Night hours (activity decreases)
+    # Night period (Activity decreases)
     "night_hours": [23],
     # Activity multipliers
     "activity_multipliers": {
-        "dead": 0.05,      # Almost no one active in the early morning
+        "dead": 0.05,      # Almost no one in the early morning
         "morning": 0.4,    # Gradually active in the morning
-        "work": 0.7,       # Moderate during work hours
+        "work": 0.7,       # Moderate activity during working hours
         "peak": 1.5,       # Evening peak
         "night": 0.5       # Decreases late at night
     }
@@ -58,14 +59,14 @@ class AgentActivityConfig:
     # Activity level (0.0-1.0)
     activity_level: float = 0.5  # Overall activity level
     
-    # Posting frequency (expected posts per hour)
+    # Posting frequency (expected number of posts per hour)
     posts_per_hour: float = 1.0
     comments_per_hour: float = 2.0
     
-    # Active time periods (24-hour format, 0-23)
+    # Active hours (24-hour clock, 0-23)
     active_hours: List[int] = field(default_factory=lambda: list(range(8, 23)))
     
-    # Response speed (delay in reacting to hot events, unit: simulated minutes)
+    # Response speed (reaction delay to hot events, unit: simulation minutes)
     response_delay_min: int = 5
     response_delay_max: int = 60
     
@@ -75,28 +76,28 @@ class AgentActivityConfig:
     # Stance (attitude towards specific topics)
     stance: str = "neutral"  # supportive, opposing, neutral, observer
     
-    # Influence weight (determines the probability of their statements being seen by other Agents)
+    # Influence weight (determines the probability of its posts being seen by other Agents)
     influence_weight: float = 1.0
 
 
 @dataclass  
 class TimeSimulationConfig:
-    """Time simulation configuration (based on Chinese daily routines)"""
-    # Total simulation duration (simulated hours)
-    total_simulation_hours: int = 72  # Default to 72 simulated hours (3 days)
+    """Time simulation configuration"""
+    # Total simulation duration (simulation hours)
+    total_simulation_hours: int = 72  # Default simulation 72 hours (3 days)
     
-    # Time represented by each round (simulated minutes) - Default 60 minutes (1 hour), speeds up time flow
+    # Time represented by each round (simulation minutes) - default 60 minutes (1 hour)
     minutes_per_round: int = 60
     
-    # Range of Agents activated per hour
+    # Range of number of Agents activated per hour
     agents_per_hour_min: int = 5
     agents_per_hour_max: int = 20
     
-    # Peak hours (19-22 PM, most active time for Chinese people)
+    # Peak hours
     peak_hours: List[int] = field(default_factory=lambda: [19, 20, 21, 22])
     peak_activity_multiplier: float = 1.5
     
-    # Off-peak hours (0-5 AM, almost no activity)
+    # Off-peak hours (Late night, almost no activity)
     off_peak_hours: List[int] = field(default_factory=lambda: [0, 1, 2, 3, 4, 5])
     off_peak_activity_multiplier: float = 0.05  # Very low activity in the early morning
     
@@ -104,15 +105,15 @@ class TimeSimulationConfig:
     morning_hours: List[int] = field(default_factory=lambda: [6, 7, 8])
     morning_activity_multiplier: float = 0.4
     
-    # Work hours
+    # Working hours
     work_hours: List[int] = field(default_factory=lambda: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18])
     work_activity_multiplier: float = 0.7
 
 
 @dataclass
 class EventConfig:
-    """Event Configuration"""
-    # Initial events (trigger events at the start of the simulation)
+    """Event configuration"""
+    # Initial posts (trigger events at the start of simulation)
     initial_posts: List[Dict[str, Any]] = field(default_factory=list)
     
     # Scheduled events (events triggered at specific times)
@@ -121,7 +122,7 @@ class EventConfig:
     # Hot topic keywords
     hot_topics: List[str] = field(default_factory=list)
     
-    # Public opinion guidance direction
+    # Narrative direction
     narrative_direction: str = ""
 
 
@@ -135,10 +136,10 @@ class PlatformConfig:
     popularity_weight: float = 0.3  # Popularity
     relevance_weight: float = 0.3  # Relevance
     
-    # Viral spread threshold (how many interactions trigger spread)
+    # Viral threshold (number of interactions required to trigger spread)
     viral_threshold: int = 10
     
-    # Echo chamber effect strength (degree of clustering of similar opinions)
+    # Echo chamber strength (degree of clustering of similar viewpoints)
     echo_chamber_strength: float = 0.5
 
 
@@ -170,7 +171,7 @@ class SimulationParameters:
     
     # Generation metadata
     generated_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    generation_reasoning: str = ""  # LLM's reasoning explanation
+    generation_reasoning: str = ""  # Reasoning explanation by LLM
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -198,12 +199,12 @@ class SimulationParameters:
 
 class SimulationConfigGenerator:
     """
-    Simulation Configuration Intelligent Generator
+    Simulation Configuration Smart Generator
     
-    Uses LLM to analyze simulation requirements, document content, and graph entity information,
-    automatically generating the best simulation parameter configuration.
+    Uses LLM to analyze simulation requirements, document content, and graph entity information
+    to automatically generate optimal simulation parameter configurations.
     
-    Adopts a step-by-step generation strategy:
+    Uses a step-by-step generation strategy:
     1. Generate time and event configurations (lightweight)
     2. Generate Agent configurations in batches (10-20 per batch)
     3. Generate platform configuration
@@ -214,11 +215,11 @@ class SimulationConfigGenerator:
     # Number of Agents generated per batch
     AGENTS_PER_BATCH = 15
     
-    # Context truncation length for each step (characters)
+    # Context truncation length for each step (number of characters)
     TIME_CONFIG_CONTEXT_LENGTH = 10000   # Time configuration
     EVENT_CONFIG_CONTEXT_LENGTH = 8000   # Event configuration
     ENTITY_SUMMARY_LENGTH = 300          # Entity summary
-    AGENT_SUMMARY_LENGTH = 300           # Entity summary in Agent configuration
+    AGENT_SUMMARY_LENGTH = 300           # Entity summary in Agent config
     ENTITIES_PER_TYPE_DISPLAY = 20       # Number of entities displayed per type
     
     def __init__(
@@ -232,7 +233,7 @@ class SimulationConfigGenerator:
         self.model_name = model_name or Config.LLM_MODEL_NAME
         
         if not self.api_key:
-            raise ValueError("LLM_API_KEY is not configured")
+            raise ValueError("LLM_API_KEY not configured")
         
         self.client = OpenAI(
             api_key=self.api_key,
@@ -252,7 +253,7 @@ class SimulationConfigGenerator:
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> SimulationParameters:
         """
-        Intelligently generates the complete simulation configuration (step-by-step generation).
+        Smartly generates complete simulation configuration (step-by-step)
         
         Args:
             simulation_id: Simulation ID
@@ -260,7 +261,7 @@ class SimulationConfigGenerator:
             graph_id: Graph ID
             simulation_requirement: Simulation requirement description
             document_text: Original document content
-            entities: Filtered entity list
+            entities: Filtered list of entities
             enable_twitter: Whether to enable Twitter
             enable_reddit: Whether to enable Reddit
             progress_callback: Progress callback function (current_step, total_steps, message)
@@ -268,9 +269,9 @@ class SimulationConfigGenerator:
         Returns:
             SimulationParameters: Complete simulation parameters
         """
-        logger.info(f"Starting intelligent generation of simulation configuration: simulation_id={simulation_id}, number of entities={len(entities)}")
+        logger.info(f"Starting smart simulation configuration generation: simulation_id={simulation_id}, entities={len(entities)}")
         
-        # Calculate total steps
+        # Calculate total number of steps
         num_batches = math.ceil(len(entities) / self.AGENTS_PER_BATCH)
         total_steps = 3 + num_batches  # Time config + Event config + N batches of Agents + Platform config
         current_step = 0
@@ -296,15 +297,15 @@ class SimulationConfigGenerator:
         num_entities = len(entities)
         time_config_result = self._generate_time_config(context, num_entities)
         time_config = self._parse_time_config(time_config_result, num_entities)
-        reasoning_parts.append(f"Time configuration: {time_config_result.get('reasoning', 'Success')}")
+        reasoning_parts.append(f"Time Config: {time_config_result.get('reasoning', 'Success')}")
         
         # ========== Step 2: Generate event configuration ==========
         report_progress(2, "Generating event configuration and hot topics...")
         event_config_result = self._generate_event_config(context, simulation_requirement, entities)
         event_config = self._parse_event_config(event_config_result)
-        reasoning_parts.append(f"Event configuration: {event_config_result.get('reasoning', 'Success')}")
+        reasoning_parts.append(f"Event Config: {event_config_result.get('reasoning', 'Success')}")
         
-        # ========== Steps 3-N: Generate Agent configuration in batches ==========
+        # ========== Step 3-N: Generate Agent configurations in batches ==========
         all_agent_configs = []
         for batch_idx in range(num_batches):
             start_idx = batch_idx * self.AGENTS_PER_BATCH
@@ -313,7 +314,7 @@ class SimulationConfigGenerator:
             
             report_progress(
                 3 + batch_idx,
-                f"Generating Agent configuration ({start_idx + 1}-{end_idx}/{len(entities)})...
+                f"Generating Agent configurations ({start_idx + 1}-{end_idx}/{len(entities)})..."
             )
             
             batch_configs = self._generate_agent_configs_batch(
@@ -324,15 +325,15 @@ class SimulationConfigGenerator:
             )
             all_agent_configs.extend(batch_configs)
         
-        reasoning_parts.append(f"Agent configuration: Successfully generated {len(all_agent_configs)} items")
+        reasoning_parts.append(f"Agent Configs: Successfully generated {len(all_agent_configs)}")
         
-        # ========== Assign initial post Agents ==========
-        logger.info("Assigning appropriate publisher Agents for initial posts...")
+        # ========== Assign poster Agents for initial posts ==========
+        logger.info("Assigning appropriate poster Agents for initial posts...")
         event_config = self._assign_initial_post_agents(event_config, all_agent_configs)
         assigned_count = len([p for p in event_config.initial_posts if p.get("poster_agent_id") is not None])
-        reasoning_parts.append(f"Initial post assignment: {assigned_count} posts assigned publishers")
+        reasoning_parts.append(f"Initial Post Assignment: {assigned_count} posts assigned with posters")
         
-        # ========== Final step: Generate platform configuration ==========
+        # ========== Last Step: Generate platform configuration ==========
         report_progress(total_steps, "Generating platform configuration...")
         twitter_config = None
         reddit_config = None
@@ -373,7 +374,7 @@ class SimulationConfigGenerator:
             generation_reasoning=" | ".join(reasoning_parts)
         )
         
-        logger.info(f"Simulation configuration generation complete: {len(params.agent_configs)} Agent configurations")
+        logger.info(f"Simulation configuration generation completed: {len(params.agent_configs)} Agent configurations")
         
         return params
     
@@ -383,37 +384,30 @@ class SimulationConfigGenerator:
         document_text: str,
         entities: List[EntityNode]
     ) -> str:
-        """Build LLM context, truncated to maximum length"""
+        """Builds LLM context, truncated to maximum length"""
         
         # Entity summary
         entity_summary = self._summarize_entities(entities)
         
         # Build context
         context_parts = [
-            f"## Simulation Requirement
-{simulation_requirement}",
-            f"
-## Entity Information ({len(entities)} items)
-{entity_summary}",
+            f"## Simulation Requirements\n{simulation_requirement}",
+            f"\n## Entity Information ({len(entities)} entities)\n{entity_summary}",
         ]
         
         current_length = sum(len(p) for p in context_parts)
-        remaining_length = self.MAX_CONTEXT_LENGTH - current_length - 500  # Leave 500 characters buffer
+        remaining_length = self.MAX_CONTEXT_LENGTH - current_length - 500  # 500 characters margin
         
         if remaining_length > 0 and document_text:
             doc_text = document_text[:remaining_length]
             if len(document_text) > remaining_length:
-                doc_text += "
-...(Document truncated)"
-            context_parts.append(f"
-## Original Document Content
-{doc_text}")
+                doc_text += "\n...(Document truncated)"
+            context_parts.append(f"\n## Original Document Content\n{doc_text}")
         
-        return "
-".join(context_parts)
+        return "\n".join(context_parts)
     
     def _summarize_entities(self, entities: List[EntityNode]) -> str:
-        """Generate entity summary"""
+        """Generates entity summary"""
         lines = []
         
         # Group by type
@@ -425,23 +419,20 @@ class SimulationConfigGenerator:
             by_type[t].append(e)
         
         for entity_type, type_entities in by_type.items():
-            lines.append(f"
-### {entity_type} ({len(type_entities)} items)")
-            # Use configured display quantity and summary length
+            lines.append(f"\n### {entity_type} ({len(type_entities)} entities)")
+            # Use configured display count and summary length
             display_count = self.ENTITIES_PER_TYPE_DISPLAY
             summary_len = self.ENTITY_SUMMARY_LENGTH
             for e in type_entities[:display_count]:
                 summary_preview = (e.summary[:summary_len] + "...") if len(e.summary) > summary_len else e.summary
                 lines.append(f"- {e.name}: {summary_preview}")
             if len(type_entities) > display_count:
-                lines.append(f"  ... {len(type_entities) - display_count} more")
+                lines.append(f"  ... and {len(type_entities) - display_count} more")
         
-        return "
-".join(lines)
+        return "\n".join(lines)
     
     def _call_llm_with_retry(self, prompt: str, system_prompt: str) -> Dict[str, Any]:
-        """LLM call with retry, includes JSON repair logic"""
-        import re
+        """LLM call with retry, includes JSON fix logic"""
         
         max_attempts = 3
         last_error = None
@@ -455,8 +446,7 @@ class SimulationConfigGenerator:
                         {"role": "user", "content": prompt}
                     ],
                     response_format={"type": "json_object"},
-                    temperature=0.7 - (attempt * 0.1)  # Reduce temperature with each retry
-                    # Do not set max_tokens, let the LLM decide freely
+                    temperature=0.7 - (attempt * 0.1)  # Decrease temperature each retry
                 )
                 
                 content = response.choices[0].message.content
@@ -467,7 +457,7 @@ class SimulationConfigGenerator:
                     logger.warning(f"LLM output truncated (attempt {attempt+1})")
                     content = self._fix_truncated_json(content)
                 
-                # Try to parse JSON
+                # Try parsing JSON
                 try:
                     return json.loads(content)
                 except json.JSONDecodeError as e:
@@ -489,14 +479,14 @@ class SimulationConfigGenerator:
         raise last_error or Exception("LLM call failed")
     
     def _fix_truncated_json(self, content: str) -> str:
-        """Fix truncated JSON"""
+        """Fixes truncated JSON"""
         content = content.strip()
         
-        # Count unclosed brackets
+        # Calculate unclosed brackets
         open_braces = content.count('{') - content.count('}')
         open_brackets = content.count('[') - content.count(']')
         
-        # Check for unclosed strings
+        # Check for unclosed string
         if content and content[-1] not in '",}]':
             content += '"'
         
@@ -507,10 +497,10 @@ class SimulationConfigGenerator:
         return content
     
     def _try_fix_config_json(self, content: str) -> Optional[Dict[str, Any]]:
-        """Attempt to fix configuration JSON"""
+        """Tries to fix configuration JSON"""
         import re
         
-        # Fix truncated cases
+        # Fix truncated case
         content = self._fix_truncated_json(content)
         
         # Extract JSON part
@@ -518,20 +508,19 @@ class SimulationConfigGenerator:
         if json_match:
             json_str = json_match.group()
             
-            # Remove newlines from strings
+            # Remove newlines in strings
             def fix_string(match):
                 s = match.group(0)
-                s = s.replace('
-', ' ').replace('', ' ')
+                s = s.replace('\n', ' ').replace('\r', ' ')
                 s = re.sub(r'\s+', ' ', s)
                 return s
             
-            json_str = re.sub(r'"[^"\]*(?:\.[^"\]*)*"', fix_string, json_str)
+            json_str = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', fix_string, json_str)
             
             try:
                 return json.loads(json_str)
             except:
-                # Try to remove all control characters
+                # Try removing all control characters
                 json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', ' ', json_str)
                 json_str = re.sub(r'\s+', ' ', json_str)
                 try:
@@ -542,31 +531,23 @@ class SimulationConfigGenerator:
         return None
     
     def _generate_time_config(self, context: str, num_entities: int) -> Dict[str, Any]:
-        """Generate time configuration"""
+        """Generates time configuration"""
         # Use configured context truncation length
         context_truncated = context[:self.TIME_CONFIG_CONTEXT_LENGTH]
         
         # Calculate maximum allowed value (80% of agent count)
         max_agents_allowed = max(1, int(num_entities * 0.9))
         
-        prompt = f"""Based on the following simulation requirements, generate the time simulation configuration.
+        prompt = f"""Based on the following simulation requirements, generate a time simulation configuration.
 
 {context_truncated}
 
-## Task
-Please generate the time configuration JSON.
+## Tasks
+Please generate a time configuration JSON.
 
-### Basic principles (for reference only, adjust flexibly based on specific events and participating groups):
-- The user group is Chinese, and needs to conform to Beijing time daily routines
-- Almost no activity from 0-5 AM (activity multiplier 0.05)
-- Gradually active from 6-8 AM (activity multiplier 0.4)
-- Moderately active during work hours 9-18 PM (activity multiplier 0.7)
-- 19-22 PM is the peak period (most active for Chinese people) (activity multiplier 1.5)
-- Activity decreases after 23 PM (activity multiplier 0.5)
-- General rules: low activity in the early morning, gradually increasing in the morning, moderate during work hours, peak in the evening
-- **Important**: The example values below are for reference only, you need to adjust specific time periods based on the nature of the event and the characteristics of the participating groups
-  - For example: student group peak may be 21-23 PM; media active all day; official agencies only during work hours
-  - For example: sudden hot events may lead to discussions even late at night, off_peak_hours can be appropriately shortened
+### Principles:
+- Adjust according to the nature of events and the characteristics of participating groups.
+- Common patterns: low activity in early morning, gradual increase in morning, moderate in work hours, peak in evening.
 
 ### Return JSON format (no markdown)
 
@@ -580,55 +561,55 @@ Example:
     "off_peak_hours": [0, 1, 2, 3, 4, 5],
     "morning_hours": [6, 7, 8],
     "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    "reasoning": "Explanation of time configuration for this event"
+    "reasoning": "Explanation for this time configuration"
 }}
 
-Field descriptions:
-- total_simulation_hours (int): Total simulation duration, 24-168 hours, short for sudden events, long for continuous topics
-- minutes_per_round (int): Duration per round, 30-120 minutes, recommended 60 minutes
-- agents_per_hour_min (int): Minimum number of Agents to activate per hour (range: 1-{max_agents_allowed})
-- agents_per_hour_max (int): Maximum number of Agents to activate per hour (range: 1-{max_agents_allowed})
-- peak_hours (int array): Peak hours, adjust according to the participating groups of the event
-- off_peak_hours (int array): Off-peak hours, usually late night/early morning
-- morning_hours (int array): Morning hours
-- work_hours (int array): Work hours
-- reasoning (string): Brief explanation of why this configuration was chosen"""
+Field Description:
+- total_simulation_hours (int): Total simulation duration, 24-168 hours. Short for emergencies, long for continuous topics.
+- minutes_per_round (int): Duration per round, 30-120 minutes, 60 is recommended.
+- agents_per_hour_min (int): Minimum Agents activated per hour (Range: 1-{max_agents_allowed}).
+- agents_per_hour_max (int): Maximum Agents activated per hour (Range: 1-{max_agents_allowed}).
+- peak_hours (int array): Peak time periods.
+- off_peak_hours (int array): Off-peak periods, usually late night.
+- morning_hours (int array): Morning periods.
+- work_hours (int array): Working periods.
+- reasoning (string): Brief explanation of why it is configured this way."""
 
-        system_prompt = "You are a social media simulation expert. Return pure JSON format, time configuration must conform to Chinese daily routines."
+        system_prompt = "You are a social media simulation expert. Return pure JSON format."
         
         try:
             return self._call_llm_with_retry(prompt, system_prompt)
         except Exception as e:
-            logger.warning(f"Time configuration LLM generation failed: {e}, using default configuration")
+            logger.warning(f"Time config LLM generation failed: {e}, using default")
             return self._get_default_time_config(num_entities)
     
     def _get_default_time_config(self, num_entities: int) -> Dict[str, Any]:
-        """Get default time configuration (Chinese daily routines)"""
+        """Gets default time configuration"""
         return {
             "total_simulation_hours": 72,
-            "minutes_per_round": 60,  # 1 hour per round, speeds up time flow
+            "minutes_per_round": 60,  # 1 hour per round
             "agents_per_hour_min": max(1, num_entities // 15),
             "agents_per_hour_max": max(5, num_entities // 5),
             "peak_hours": [19, 20, 21, 22],
             "off_peak_hours": [0, 1, 2, 3, 4, 5],
             "morning_hours": [6, 7, 8],
             "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-            "reasoning": "Using default Chinese daily routines configuration (1 hour per round)"
+            "reasoning": "Using default routine configuration (1 hour per round)"
         }
     
     def _parse_time_config(self, result: Dict[str, Any], num_entities: int) -> TimeSimulationConfig:
-        """Parse time configuration results, and validate agents_per_hour values do not exceed total agents"""
-        # Get original values
+        """Parses time configuration result and validates agents_per_hour values"""
+        # Get raw values
         agents_per_hour_min = result.get("agents_per_hour_min", max(1, num_entities // 15))
         agents_per_hour_max = result.get("agents_per_hour_max", max(5, num_entities // 5))
         
-        # Validate and correct: ensure not to exceed total agents
+        # Validate and fix: ensure not exceeding total agent count
         if agents_per_hour_min > num_entities:
-            logger.warning(f"agents_per_hour_min ({agents_per_hour_min}) exceeds total agents ({num_entities}), corrected")
+            logger.warning(f"agents_per_hour_min ({agents_per_hour_min}) exceeds total Agents ({num_entities}), corrected")
             agents_per_hour_min = max(1, num_entities // 10)
         
         if agents_per_hour_max > num_entities:
-            logger.warning(f"agents_per_hour_max ({agents_per_hour_max}) exceeds total agents ({num_entities}), corrected")
+            logger.warning(f"agents_per_hour_max ({agents_per_hour_max}) exceeds total Agents ({num_entities}), corrected")
             agents_per_hour_max = max(agents_per_hour_min + 1, num_entities // 2)
         
         # Ensure min < max
@@ -638,12 +619,12 @@ Field descriptions:
         
         return TimeSimulationConfig(
             total_simulation_hours=result.get("total_simulation_hours", 72),
-            minutes_per_round=result.get("minutes_per_round", 60),  # Default 1 hour per round
+            minutes_per_round=result.get("minutes_per_round", 60),
             agents_per_hour_min=agents_per_hour_min,
             agents_per_hour_max=agents_per_hour_max,
             peak_hours=result.get("peak_hours", [19, 20, 21, 22]),
             off_peak_hours=result.get("off_peak_hours", [0, 1, 2, 3, 4, 5]),
-            off_peak_activity_multiplier=0.05,  # Very low activity in the early morning
+            off_peak_activity_multiplier=0.05,
             morning_hours=result.get("morning_hours", [6, 7, 8]),
             morning_activity_multiplier=0.4,
             work_hours=result.get("work_hours", list(range(9, 19))),
@@ -657,9 +638,9 @@ Field descriptions:
         simulation_requirement: str,
         entities: List[EntityNode]
     ) -> Dict[str, Any]:
-        """Generate event configuration"""
+        """Generates event configuration"""
         
-        # Get available entity type list for LLM reference
+        # Get available entity types list for LLM reference
         entity_types_available = list(set(
             e.get_entity_type() or "Unknown" for e in entities
         ))
@@ -673,8 +654,7 @@ Field descriptions:
             if len(type_examples[etype]) < 3:
                 type_examples[etype].append(e.name)
         
-        type_info = "
-".join([
+        type_info = "\n".join([
             f"- {t}: {', '.join(examples)}" 
             for t, examples in type_examples.items()
         ])
@@ -682,41 +662,41 @@ Field descriptions:
         # Use configured context truncation length
         context_truncated = context[:self.EVENT_CONFIG_CONTEXT_LENGTH]
         
-        prompt = f"""Based on the following simulation requirements, generate event configuration.
+        prompt = f"""Based on the following simulation requirements, generate an event configuration.
 
-Simulation Requirement: {simulation_requirement}
+Simulation Requirements: {simulation_requirement}
 
 {context_truncated}
 
 ## Available Entity Types and Examples
 {type_info}
 
-## Task
-Please generate the event configuration JSON:
+## Tasks
+Please generate an event configuration JSON:
 - Extract hot topic keywords
-- Describe the direction of public opinion development
+- Describe narrative development direction
 - Design initial post content, **each post must specify poster_type (publisher type)**
 
-**Important**: poster_type must be selected from the "Available Entity Types" above, so that initial posts can be assigned to appropriate Agents for publishing.
-For example: official statements should be published by Official/University types, news by MediaOutlet, student opinions by Student.
+**Important**: poster_type MUST be selected from the "Available Entity Types" above.
+For example: Official statements should be posted by Official/University type, news by MediaOutlet, student opinions by Student.
 
 Return JSON format (no markdown):
 {{
     "hot_topics": ["keyword1", "keyword2", ...],
-    "narrative_direction": "<description of public opinion development direction>",
+    "narrative_direction": "<narrative development direction description>",
     "initial_posts": [
-        {{"content": "Post content", "poster_type": "Entity Type (must be selected from available types)"}},
+        {{"content": "post content", "poster_type": "entity type (must choose from available types)"}},
         ...
     ],
-    "reasoning": "<Brief explanation>"
+    "reasoning": "<brief explanation>"
 }}"""
 
-        system_prompt = "You are a public opinion analysis expert. Return pure JSON format. Note that poster_type must precisely match available entity types."
+        system_prompt = "You are a public opinion analysis expert. Return pure JSON format. Note poster_type must exactly match available entity types."
         
         try:
             return self._call_llm_with_retry(prompt, system_prompt)
         except Exception as e:
-            logger.warning(f"Event configuration LLM generation failed: {e}, using default configuration")
+            logger.warning(f"Event config LLM generation failed: {e}, using default")
             return {
                 "hot_topics": [],
                 "narrative_direction": "",
@@ -725,7 +705,7 @@ Return JSON format (no markdown):
             }
     
     def _parse_event_config(self, result: Dict[str, Any]) -> EventConfig:
-        """Parse event configuration results"""
+        """Parses event configuration result"""
         return EventConfig(
             initial_posts=result.get("initial_posts", []),
             scheduled_events=[],
@@ -739,9 +719,8 @@ Return JSON format (no markdown):
         agent_configs: List[AgentActivityConfig]
     ) -> EventConfig:
         """
-        Assign appropriate publisher Agents for initial posts
-        
-        Matches the most suitable agent_id based on each post's poster_type
+        Assigns appropriate poster Agents for initial posts.
+        Matches the best agent_id according to each post's poster_type.
         """
         if not event_config.initial_posts:
             return event_config
@@ -754,7 +733,7 @@ Return JSON format (no markdown):
                 agents_by_type[etype] = []
             agents_by_type[etype].append(agent)
         
-        # Type mapping table (handles different formats LLM might output)
+        # Type alias table
         type_aliases = {
             "official": ["official", "university", "governmentagency", "government"],
             "university": ["university", "official"],
@@ -766,7 +745,7 @@ Return JSON format (no markdown):
             "person": ["person", "student", "alumni"],
         }
         
-        # Record used agent index for each type to avoid reusing the same agent
+        # Keep track of used agent index for each type to avoid reuse
         used_indices: Dict[str, int] = {}
         
         updated_posts = []
@@ -774,7 +753,7 @@ Return JSON format (no markdown):
             poster_type = post.get("poster_type", "").lower()
             content = post.get("content", "")
             
-            # Try to find a matching agent
+            # Try to find matching agent
             matched_agent_id = None
             
             # 1. Direct match
@@ -784,7 +763,7 @@ Return JSON format (no markdown):
                 matched_agent_id = agents[idx].agent_id
                 used_indices[poster_type] = idx + 1
             else:
-                # 2. Match using aliases
+                # 2. Use alias match
                 for alias_key, aliases in type_aliases.items():
                     if poster_type in aliases or alias_key == poster_type:
                         for alias in aliases:
@@ -797,11 +776,11 @@ Return JSON format (no markdown):
                     if matched_agent_id is not None:
                         break
             
-            # 3. If still not found, use the agent with the highest influence
+            # 3. If still not found, use the highest influence agent
             if matched_agent_id is None:
-                logger.warning(f"No matching Agent found for type '{poster_type}', using the Agent with the highest influence")
+                logger.warning(f"No matching Agent for type '{poster_type}', using highest influence Agent")
                 if agent_configs:
-                    # Sort by influence, select the highest influence one
+                    # Sort by influence weight descending
                     sorted_agents = sorted(agent_configs, key=lambda a: a.influence_weight, reverse=True)
                     matched_agent_id = sorted_agents[0].agent_id
                 else:
@@ -825,9 +804,9 @@ Return JSON format (no markdown):
         start_idx: int,
         simulation_requirement: str
     ) -> List[AgentActivityConfig]:
-        """Generate Agent configuration in batches"""
+        """Generates Agent configurations in batches"""
         
-        # Build entity information (use configured summary length)
+        # Build entity information (using configured summary length)
         entity_list = []
         summary_len = self.AGENT_SUMMARY_LENGTH
         for i, e in enumerate(entities):
@@ -840,32 +819,31 @@ Return JSON format (no markdown):
         
         prompt = f"""Based on the following information, generate social media activity configurations for each entity.
 
-Simulation Requirement: {simulation_requirement}
+Simulation Requirements: {simulation_requirement}
 
 ## Entity List
 ```json
 {json.dumps(entity_list, ensure_ascii=False, indent=2)}
 ```
 
-## Task
-Generate activity configurations for each entity, noting:
-- **Time conforms to Chinese daily routines**: Almost no activity from 0-5 AM, most active from 19-22 PM
-- **Official institutions** (University/GovernmentAgency): Low activity (0.1-0.3), active during work hours (9-17), slow response (60-240 minutes), high influence (2.5-3.0)
-- **Media** (MediaOutlet): Moderate activity (0.4-0.6), active all day (8-23), fast response (5-30 minutes), high influence (2.0-2.5)
-- **Individuals** (Student/Person/Alumni): High activity (0.6-0.9), mainly active in the evening (18-23), fast response (1-15 minutes), low influence (0.8-1.2)
-- **Public figures/Experts**: Moderate activity (0.4-0.6), moderate to high influence (1.5-2.0)
+## Tasks
+Generate activity configuration for each entity. Note:
+- **Official Institutions** (University/GovernmentAgency): Low activity level (0.1-0.3), active during working hours (9-17), slow response (60-240 min), high influence (2.5-3.0)
+- **Media** (MediaOutlet): Medium activity level (0.4-0.6), active all day (8-23), fast response (5-30 min), high influence (2.0-2.5)
+- **Individuals** (Student/Person/Alumni): High activity level (0.6-0.9), active mostly in the evening (18-23), fast response (1-15 min), low influence (0.8-1.2)
+- **Public Figures/Experts**: Medium activity level (0.4-0.6), medium-high influence (1.5-2.0)
 
 Return JSON format (no markdown):
 {{
     "agent_configs": [
         {{
-            "agent_id": <must match input>,
+            "agent_id": <must be consistent with input>,
             "activity_level": <0.0-1.0>,
             "posts_per_hour": <posting frequency>,
-            "comments_per_hour": <commenting frequency>,
-            "active_hours": [<list of active hours, considering Chinese daily routines>],
-            "response_delay_min": <minimum response delay in minutes>,
-            "response_delay_max": <maximum response delay in minutes>,
+            "comments_per_hour": <comment frequency>,
+            "active_hours": [<active hours list>],
+            "response_delay_min": <min response delay minutes>,
+            "response_delay_max": <max response delay minutes>,
             "sentiment_bias": <-1.0 to 1.0>,
             "stance": "<supportive/opposing/neutral/observer>",
             "influence_weight": <influence weight>
@@ -874,13 +852,13 @@ Return JSON format (no markdown):
     ]
 }}"""
 
-        system_prompt = "You are a social media behavior analysis expert. Return pure JSON, configuration must conform to Chinese daily routines."
+        system_prompt = "You are a social media behavior analysis expert. Return pure JSON."
         
         try:
             result = self._call_llm_with_retry(prompt, system_prompt)
             llm_configs = {cfg["agent_id"]: cfg for cfg in result.get("agent_configs", [])}
         except Exception as e:
-            logger.warning(f"Agent configuration batch LLM generation failed: {e}, using rule-based generation")
+            logger.warning(f"Agent batch configuration LLM generation failed: {e}, using rules")
             llm_configs = {}
         
         # Build AgentActivityConfig objects
@@ -889,7 +867,7 @@ Return JSON format (no markdown):
             agent_id = start_idx + i
             cfg = llm_configs.get(agent_id, {})
             
-            # If LLM did not generate, use rule-based generation
+            # If LLM didn't generate, use rule-based generation
             if not cfg:
                 cfg = self._generate_agent_config_by_rule(entity)
             
@@ -913,11 +891,11 @@ Return JSON format (no markdown):
         return configs
     
     def _generate_agent_config_by_rule(self, entity: EntityNode) -> Dict[str, Any]:
-        """Generate single Agent configuration based on rules (Chinese daily routines)"""
+        """Generates individual Agent configuration based on rules"""
         entity_type = (entity.get_entity_type() or "Unknown").lower()
         
         if entity_type in ["university", "governmentagency", "ngo"]:
-            # Official institutions: active during work hours, low frequency, high influence
+            # Official Institutions: Active during working hours, low frequency, high influence
             return {
                 "activity_level": 0.2,
                 "posts_per_hour": 0.1,
@@ -930,7 +908,7 @@ Return JSON format (no markdown):
                 "influence_weight": 3.0
             }
         elif entity_type in ["mediaoutlet"]:
-            # Media: active all day, moderate frequency, high influence
+            # Media: Active all day, medium frequency, high influence
             return {
                 "activity_level": 0.5,
                 "posts_per_hour": 0.8,
@@ -943,7 +921,7 @@ Return JSON format (no markdown):
                 "influence_weight": 2.5
             }
         elif entity_type in ["professor", "expert", "official"]:
-            # Experts/Professors: active during work + evening, moderate frequency
+            # Expert/Professor: Active during work + evening, medium frequency
             return {
                 "activity_level": 0.4,
                 "posts_per_hour": 0.3,
@@ -956,12 +934,12 @@ Return JSON format (no markdown):
                 "influence_weight": 2.0
             }
         elif entity_type in ["student"]:
-            # Students: mainly active in the evening, high frequency
+            # Student: Mostly in the evening, high frequency
             return {
                 "activity_level": 0.8,
                 "posts_per_hour": 0.6,
                 "comments_per_hour": 1.5,
-                "active_hours": [8, 9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23],  # Morning + Evening
+                "active_hours": [8, 9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23],
                 "response_delay_min": 1,
                 "response_delay_max": 15,
                 "sentiment_bias": 0.0,
@@ -969,12 +947,12 @@ Return JSON format (no markdown):
                 "influence_weight": 0.8
             }
         elif entity_type in ["alumni"]:
-            # Alumni: mainly active in the evening
+            # Alumni: Mostly in the evening
             return {
                 "activity_level": 0.6,
                 "posts_per_hour": 0.4,
                 "comments_per_hour": 0.8,
-                "active_hours": [12, 13, 19, 20, 21, 22, 23],  # Lunch break + Evening
+                "active_hours": [12, 13, 19, 20, 21, 22, 23],
                 "response_delay_min": 5,
                 "response_delay_max": 30,
                 "sentiment_bias": 0.0,
@@ -982,16 +960,17 @@ Return JSON format (no markdown):
                 "influence_weight": 1.0
             }
         else:
-            # Ordinary people: evening peak
+            # Ordinary person: Evening peak
             return {
                 "activity_level": 0.7,
                 "posts_per_hour": 0.5,
                 "comments_per_hour": 1.2,
-                "active_hours": [9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23],  # Daytime + Evening
+                "active_hours": [9, 10, 11, 12, 13, 18, 19, 20, 21, 22, 23],
                 "response_delay_min": 2,
                 "response_delay_max": 20,
                 "sentiment_bias": 0.0,
                 "stance": "neutral",
                 "influence_weight": 1.0
             }
+    
 

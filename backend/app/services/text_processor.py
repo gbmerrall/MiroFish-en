@@ -2,7 +2,7 @@
 Text Processing Service
 """
 
-from typing import List, Optional
+from typing import List
 from ..utils.file_parser import FileParser, split_text_into_chunks
 
 
@@ -11,7 +11,7 @@ class TextProcessor:
     
     @staticmethod
     def extract_from_files(file_paths: List[str]) -> str:
-        """Extract text from multiple files"""
+        """Extracts text from multiple files"""
         return FileParser.extract_from_multiple(file_paths)
     
     @staticmethod
@@ -21,7 +21,7 @@ class TextProcessor:
         overlap: int = 50
     ) -> List[str]:
         """
-        Split text into chunks
+        Splits text into chunks
         
         Args:
             text: Original text
@@ -36,9 +36,9 @@ class TextProcessor:
     @staticmethod
     def preprocess_text(text: str) -> str:
         """
-        Preprocess text
-        - Remove redundant whitespace
-        - Standardize newlines
+        Preprocesses text
+        - Removes redundant whitespace
+        - Standardizes newlines
         
         Args:
             text: Original text
@@ -49,31 +49,22 @@ class TextProcessor:
         import re
         
         # Standardize newlines
-        text = text.replace('
-', '
-').replace('', '
-')
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # Remove consecutive empty lines (keep at most two newlines)
-        text = re.sub(r'
-{3,}', '
-
-', text)
+        # Remove consecutive blank lines (keep at most two newlines)
+        text = re.sub(r'\n{3,}', '\n\n', text)
         
-        # Remove leading/trailing whitespace from lines
-        lines = [line.strip() for line in text.split('
-')]
-        text = '
-'.join(lines)
+        # Remove leading and trailing whitespace from each line
+        lines = [line.strip() for line in text.split('\n')]
+        text = '\n'.join(lines)
         
         return text.strip()
     
     @staticmethod
     def get_text_stats(text: str) -> dict:
-        """Get text statistics"""
+        """Gets text statistics"""
         return {
             "total_chars": len(text),
-            "total_lines": text.count('
-') + 1,
+            "total_lines": text.count('\n') + 1,
             "total_words": len(text.split()),
         }

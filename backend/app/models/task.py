@@ -1,6 +1,6 @@
 """
-Task State Management
-Used to track long-running tasks (e.g., graph building)
+Task Status Management
+Used to track long-running tasks like graph building.
 """
 
 import uuid
@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 
 class TaskStatus(str, Enum):
     """Task Status Enum"""
-    PENDING = "pending"          # Pending
-    PROCESSING = "processing"    # Processing
+    PENDING = "pending"          # Waiting
+    PROCESSING = "processing"    # In progress
     COMPLETED = "completed"      # Completed
     FAILED = "failed"            # Failed
 
@@ -27,15 +27,15 @@ class Task:
     status: TaskStatus
     created_at: datetime
     updated_at: datetime
-    progress: int = 0              # Total progress percentage 0-100
+    progress: int = 0              # Overall progress percentage 0-100
     message: str = ""              # Status message
     result: Optional[Dict] = None  # Task result
     error: Optional[str] = None    # Error message
-    metadata: Dict = field(default_factory=dict)  # Additional metadata
-    progress_detail: Dict = field(default_factory=dict)  # Detailed progress information
+    metadata: Dict = field(default_factory=dict)  # Extra metadata
+    progress_detail: Dict = field(default_factory=dict)  # Detailed progress info
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Converts to dictionary"""
         return {
             "task_id": self.task_id,
             "task_type": self.task_type,
@@ -54,7 +54,7 @@ class Task:
 class TaskManager:
     """
     Task Manager
-    Thread-safe task state management
+    Thread-safe task status management.
     """
     
     _instance = None
@@ -72,11 +72,11 @@ class TaskManager:
     
     def create_task(self, task_type: str, metadata: Optional[Dict] = None) -> str:
         """
-        Create a new task
+        Creates new task
         
         Args:
-            task_type: Type of task
-            metadata: Additional metadata
+            task_type: Task type
+            metadata: Extra metadata
             
         Returns:
             Task ID
@@ -99,7 +99,7 @@ class TaskManager:
         return task_id
     
     def get_task(self, task_id: str) -> Optional[Task]:
-        """Get task"""
+        """Gets task"""
         with self._task_lock:
             return self._tasks.get(task_id)
     
@@ -114,7 +114,7 @@ class TaskManager:
         progress_detail: Optional[Dict] = None
     ):
         """
-        Update task status
+        Updates task status
         
         Args:
             task_id: Task ID
@@ -122,8 +122,8 @@ class TaskManager:
             progress: Progress
             message: Message
             result: Result
-            error: Error message
-            progress_detail: Detailed progress information
+            error: Error info
+            progress_detail: Detailed progress info
         """
         with self._task_lock:
             task = self._tasks.get(task_id)
@@ -143,7 +143,7 @@ class TaskManager:
                     task.progress_detail = progress_detail
     
     def complete_task(self, task_id: str, result: Dict):
-        """Mark task as complete"""
+        """Marks task as completed"""
         self.update_task(
             task_id,
             status=TaskStatus.COMPLETED,
@@ -153,7 +153,7 @@ class TaskManager:
         )
     
     def fail_task(self, task_id: str, error: str):
-        """Mark task as failed"""
+        """Marks task as failed"""
         self.update_task(
             task_id,
             status=TaskStatus.FAILED,
@@ -162,7 +162,7 @@ class TaskManager:
         )
     
     def list_tasks(self, task_type: Optional[str] = None) -> list:
-        """List tasks"""
+        """Lists tasks"""
         with self._task_lock:
             tasks = list(self._tasks.values())
             if task_type:
@@ -170,7 +170,7 @@ class TaskManager:
             return [t.to_dict() for t in sorted(tasks, key=lambda x: x.created_at, reverse=True)]
     
     def cleanup_old_tasks(self, max_age_hours: int = 24):
-        """Clean up old tasks"""
+        """Cleans up old tasks"""
         from datetime import timedelta
         cutoff = datetime.now() - timedelta(hours=max_age_hours)
         

@@ -1,6 +1,6 @@
 """
-LLM client encapsulation
-Unified calling using OpenAI format
+LLM Client Wrapper
+Uniformly uses OpenAI format for calls.
 """
 
 import json
@@ -25,7 +25,7 @@ class LLMClient:
         self.model = model or Config.LLM_MODEL_NAME
         
         if not self.api_key:
-            raise ValueError("LLM_API_KEY not configured")
+            raise ValueError("LLM_API_KEY is not configured")
         
         self.client = OpenAI(
             api_key=self.api_key,
@@ -40,10 +40,10 @@ class LLMClient:
         response_format: Optional[Dict] = None
     ) -> str:
         """
-        Send chat request
+        Sends chat request
         
         Args:
-            messages: Message list
+            messages: List of messages
             temperature: Temperature parameter
             max_tokens: Maximum tokens
             response_format: Response format (e.g., JSON mode)
@@ -63,7 +63,7 @@ class LLMClient:
         
         response = self.client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content
-        # Some models (e.g., MiniMax M2.5) may include <think> thinking content in the response, which needs to be removed
+        # Some models (e.g., MiniMax M2.5) include <think> content in content, which needs to be removed
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
         return content
     
@@ -74,10 +74,10 @@ class LLMClient:
         max_tokens: int = 4096
     ) -> Dict[str, Any]:
         """
-        Send chat request and return JSON
+        Sends chat request and returns JSON
         
         Args:
-            messages: Message list
+            messages: List of messages
             temperature: Temperature parameter
             max_tokens: Maximum tokens
             
@@ -90,12 +90,10 @@ class LLMClient:
             max_tokens=max_tokens,
             response_format={"type": "json_object"}
         )
-        # Clean up markdown code block tags
+        # Clean markdown code block markers
         cleaned_response = response.strip()
-        cleaned_response = re.sub(r'^```(?:json)?\s*
-?', '', cleaned_response, flags=re.IGNORECASE)
-        cleaned_response = re.sub(r'
-?```\s*$', '', cleaned_response)
+        cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
+        cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
         cleaned_response = cleaned_response.strip()
 
         try:

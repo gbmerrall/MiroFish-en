@@ -1,11 +1,11 @@
 """
-MiroFish Backend Startup Entry
+MiroFish Backend Entry Point
 """
 
 import os
 import sys
 
-# Solve the problem of garbled Chinese characters in Windows console: set UTF-8 encoding before all imports
+# Resolve Windows console Chinese character encoding issues: set UTF-8 encoding before all imports
 if sys.platform == 'win32':
     # Set environment variables to ensure Python uses UTF-8
     os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
@@ -27,7 +27,7 @@ def main():
     # Validate configuration
     errors = Config.validate()
     if errors:
-        print("Configuration error:")
+        print("Configuration errors:")
         for err in errors:
             print(f"  - {err}")
         print("\nPlease check the configuration in the .env file")
@@ -47,4 +47,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

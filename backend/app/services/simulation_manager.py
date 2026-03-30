@@ -1,36 +1,34 @@
 """
 OASIS Simulation Manager
-Manages Twitter and Reddit dual-platform parallel simulations
-Uses preset scripts + LLM intelligent generation for configuration parameters
+Manages dual-platform parallel simulation for Twitter and Reddit.
+Uses preset scripts + LLM smart generation for configuration parameters.
 """
 
 import os
 import json
-import shutil
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from ..config import Config
 from ..utils.logger import get_logger
-from .zep_entity_reader import ZepEntityReader, FilteredEntities
-from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
-from .simulation_config_generator import SimulationConfigGenerator, SimulationParameters
+from .zep_entity_reader import ZepEntityReader
+from .oasis_profile_generator import OasisProfileGenerator
+from .simulation_config_generator import SimulationConfigGenerator
 
 logger = get_logger('mirofish.simulation')
 
 
 class SimulationStatus(str, Enum):
     """Simulation Status"""
-    CREATED = "created"              # Just created, file uploaded
-    PREPARING = "preparing"          # Preparing environment
-    READY = "ready"                  # Environment ready
-    RUNNING = "running"              # Simulation running
-    PAUSED = "paused"                # Simulation paused
-    STOPPED = "stopped"              # Simulation manually stopped
-    COMPLETED = "completed"          # Simulation naturally completed
-    FAILED = "failed"                # Failed
+    CREATED = "created"
+    PREPARING = "preparing"
+    READY = "ready"
+    RUNNING = "running"
+    PAUSED = "paused"
+    STOPPED = "stopped"      # Manually stopped
+    COMPLETED = "completed"  # Completed naturally
+    FAILED = "failed"
 
 
 class PlatformType(str, Enum):
@@ -46,7 +44,7 @@ class SimulationState:
     project_id: str
     graph_id: str
     
-    # Platform enabled status
+    # Platform enable status
     enable_twitter: bool = True
     enable_reddit: bool = True
     
@@ -58,7 +56,7 @@ class SimulationState:
     profiles_count: int = 0
     entity_types: List[str] = field(default_factory=list)
     
-    # Configuration generation information
+    # Configuration generation info
     config_generated: bool = False
     config_reasoning: str = ""
     
@@ -71,11 +69,11 @@ class SimulationState:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     
-    # Error information
+    # Error message
     error: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        """Full status dictionary (internal use)"""
+        """Full state dictionary (internal use)"""
         return {
             "simulation_id": self.simulation_id,
             "project_id": self.project_id,
@@ -97,7 +95,7 @@ class SimulationState:
         }
     
     def to_simple_dict(self) -> Dict[str, Any]:
-        """Simplified status dictionary (for API return)"""
+        """Simplified state dictionary (API use)"""
         return {
             "simulation_id": self.simulation_id,
             "project_id": self.project_id,
@@ -115,15 +113,14 @@ class SimulationManager:
     """
     Simulation Manager
     
-    Core functions:
-    1. Read and filter entities from the Zep graph
-    2. Generate OASIS Agent Profiles for each entity
-    3. Use LLM to intelligently generate simulation configuration parameters (time, activity, posting frequency, etc.)
-    4. Save configuration and Profile files
-    5. Copy preset scripts to the simulation directory
+    Main Features:
+    1. Reads and filters entities from Zep graph.
+    2. Generates OASIS Agent Profiles.
+    3. Uses LLM to smartly generate simulation configuration parameters.
+    4. Prepares all files required by preset scripts.
     """
     
-    # Simulation data storage directory
+    # Directory for storing simulation data
     SIMULATION_DATA_DIR = os.path.join(
         os.path.dirname(__file__), 
         '../../uploads/simulations'
@@ -137,13 +134,13 @@ class SimulationManager:
         self._simulations: Dict[str, SimulationState] = {}
     
     def _get_simulation_dir(self, simulation_id: str) -> str:
-        """Get simulation data directory"""
+        """Gets simulation data directory"""
         sim_dir = os.path.join(self.SIMULATION_DATA_DIR, simulation_id)
         os.makedirs(sim_dir, exist_ok=True)
         return sim_dir
     
     def _save_simulation_state(self, state: SimulationState):
-        """Save simulation state to file"""
+        """Saves simulation state to file"""
         sim_dir = self._get_simulation_dir(state.simulation_id)
         state_file = os.path.join(sim_dir, "state.json")
         
@@ -155,7 +152,7 @@ class SimulationManager:
         self._simulations[state.simulation_id] = state
     
     def _load_simulation_state(self, simulation_id: str) -> Optional[SimulationState]:
-        """Load simulation state from file"""
+        """Loads simulation state from file"""
         if simulation_id in self._simulations:
             return self._simulations[simulation_id]
         
@@ -199,11 +196,11 @@ class SimulationManager:
         enable_reddit: bool = True,
     ) -> SimulationState:
         """
-        Create a new simulation
+        Creates a new simulation
         
         Args:
             project_id: Project ID
-            graph_id: Zep graph ID
+            graph_id: Zep Graph ID
             enable_twitter: Whether to enable Twitter simulation
             enable_reddit: Whether to enable Reddit simulation
             
@@ -238,23 +235,23 @@ class SimulationManager:
         parallel_profile_count: int = 3
     ) -> SimulationState:
         """
-        Prepare simulation environment (fully automated)
+        Prepares simulation environment (full automation)
         
         Steps:
-        1. Read and filter entities from the Zep graph
-        2. Generate OASIS Agent Profiles for each entity (optional LLM enhancement, supports parallelism)
-        3. Use LLM to intelligently generate simulation configuration parameters (time, activity, posting frequency, etc.)
-        4. Save configuration and Profile files
-        5. Copy preset scripts to the simulation directory
+        1. Reads and filters entities from Zep graph.
+        2. Generates OASIS Agent Profile for each entity (optional LLM enhancement, supports parallel).
+        3. Uses LLM to smartly generate simulation configuration parameters (time, activity, frequency, etc.).
+        4. Saves config and profile files.
+        5. Copies preset scripts to simulation directory.
         
         Args:
             simulation_id: Simulation ID
-            simulation_requirement: Simulation requirement description (for LLM configuration generation)
-            document_text: Original document content (for LLM background understanding)
+            simulation_requirement: Simulation requirement description
+            document_text: Original document text
             defined_entity_types: Predefined entity types (optional)
-            use_llm_for_profiles: Whether to use LLM to generate detailed profiles
+            use_llm_for_profiles: Whether to use LLM for detailed personas
             progress_callback: Progress callback function (stage, progress, message)
-            parallel_profile_count: Number of profiles to generate in parallel, default 3
+            parallel_profile_count: Number of parallel profile generations, default 3
             
         Returns:
             SimulationState
@@ -269,7 +266,7 @@ class SimulationManager:
             
             sim_dir = self._get_simulation_dir(simulation_id)
             
-            # ========== Phase 1: Read and filter entities ==========
+            # ========== Stage 1: Read and filter entities ==========
             if progress_callback:
                 progress_callback("reading", 0, "Connecting to Zep graph...")
             
@@ -290,18 +287,18 @@ class SimulationManager:
             if progress_callback:
                 progress_callback(
                     "reading", 100, 
-                    f"Completed, {filtered.filtered_count} entities in total",
+                    f"Completed, found {filtered.filtered_count} entities",
                     current=filtered.filtered_count,
                     total=filtered.filtered_count
                 )
             
             if filtered.filtered_count == 0:
                 state.status = SimulationStatus.FAILED
-                state.error = "No matching entities found, please check if the graph is built correctly"
+                state.error = "No matching entities found, please check if the graph is correctly built"
                 self._save_simulation_state(state)
                 return state
             
-            # ========== Phase 2: Generate Agent Profiles ==========
+            # ========== Stage 2: Generate Agent Profiles ==========
             total_entities = len(filtered.entities)
             
             if progress_callback:
@@ -312,7 +309,7 @@ class SimulationManager:
                     total=total_entities
                 )
             
-            # Pass graph_id to enable Zep retrieval function, to get richer context
+            # Pass graph_id to enable Zep retrieval for richer context
             generator = OasisProfileGenerator(graph_id=state.graph_id)
             
             def profile_progress(current, total, msg):
@@ -326,7 +323,7 @@ class SimulationManager:
                         item_name=msg
                     )
             
-            # Set real-time save file path (prioritize Reddit JSON format)
+            # Set realtime output paths (prefer Reddit JSON)
             realtime_output_path = None
             realtime_platform = "reddit"
             if state.enable_reddit:
@@ -341,19 +338,18 @@ class SimulationManager:
                 use_llm=use_llm_for_profiles,
                 progress_callback=profile_progress,
                 graph_id=state.graph_id,  # Pass graph_id for Zep retrieval
-                parallel_count=parallel_profile_count,  # Parallel generation count
-                realtime_output_path=realtime_output_path,  # Real-time save path
-                output_platform=realtime_platform  # Output format
+                parallel_count=parallel_profile_count,  # Parallel count
+                realtime_output_path=realtime_output_path,  # Real-time path
+                output_platform=realtime_platform  # Format
             )
             
             state.profiles_count = len(profiles)
             
-            # Save Profile files (Note: Twitter uses CSV format, Reddit uses JSON format)
-            # Reddit is already saved in real-time during generation, save again here to ensure completeness
+            # Save Profile files (Note: Twitter uses CSV, Reddit uses JSON)
             if progress_callback:
                 progress_callback(
                     "generating_profiles", 95, 
-                    "Saving Profile files...",
+                    "Saving profile files...",
                     current=total_entities,
                     total=total_entities
                 )
@@ -366,7 +362,7 @@ class SimulationManager:
                 )
             
             if state.enable_twitter:
-                # Twitter uses CSV format! This is required by OASIS
+                # Twitter requires CSV format
                 generator.save_profiles(
                     profiles=profiles,
                     file_path=os.path.join(sim_dir, "twitter_profiles.csv"),
@@ -376,12 +372,12 @@ class SimulationManager:
             if progress_callback:
                 progress_callback(
                     "generating_profiles", 100, 
-                    f"Completed, {len(profiles)} Profiles in total",
+                    f"Completed, generated {len(profiles)} profiles",
                     current=len(profiles),
                     total=len(profiles)
                 )
             
-            # ========== Phase 3: LLM intelligently generates simulation configuration ==========
+            # ========== Stage 3: Smart generation of simulation configuration ==========
             if progress_callback:
                 progress_callback(
                     "generating_config", 0, 
@@ -395,7 +391,7 @@ class SimulationManager:
             if progress_callback:
                 progress_callback(
                     "generating_config", 30, 
-                    "Calling LLM to generate configuration...",
+                    "Calling LLM to generate config...",
                     current=1,
                     total=3
                 )
@@ -414,7 +410,7 @@ class SimulationManager:
             if progress_callback:
                 progress_callback(
                     "generating_config", 70, 
-                    "Saving configuration file...",
+                    "Saving config file...",
                     current=2,
                     total=3
                 )
@@ -430,19 +426,16 @@ class SimulationManager:
             if progress_callback:
                 progress_callback(
                     "generating_config", 100, 
-                    "Configuration generation complete",
+                    "Configuration generation completed",
                     current=3,
                     total=3
                 )
-            
-            # Note: Run scripts remain in backend/scripts/ directory, no longer copied to simulation directory
-            # When starting simulation, simulation_runner will run scripts from the scripts/ directory
             
             # Update status
             state.status = SimulationStatus.READY
             self._save_simulation_state(state)
             
-            logger.info(f"Simulation preparation complete: {simulation_id}, "
+            logger.info(f"Simulation preparation completed: {simulation_id}, "
                        f"entities={state.entities_count}, profiles={state.profiles_count}")
             
             return state
@@ -457,18 +450,16 @@ class SimulationManager:
             raise
     
     def get_simulation(self, simulation_id: str) -> Optional[SimulationState]:
-        """Get simulation status"""
+        """Gets simulation state"""
         return self._load_simulation_state(simulation_id)
     
     def list_simulations(self, project_id: Optional[str] = None) -> List[SimulationState]:
-        """
-        List all simulations
-        """
+        """Lists all simulations"""
         simulations = []
         
         if os.path.exists(self.SIMULATION_DATA_DIR):
             for sim_id in os.listdir(self.SIMULATION_DATA_DIR):
-                # Skip hidden files (like .DS_Store) and non-directory files
+                # Skip hidden files and non-directory files
                 sim_path = os.path.join(self.SIMULATION_DATA_DIR, sim_id)
                 if sim_id.startswith('.') or not os.path.isdir(sim_path):
                     continue
@@ -481,7 +472,7 @@ class SimulationManager:
         return simulations
     
     def get_profiles(self, simulation_id: str, platform: str = "reddit") -> List[Dict[str, Any]]:
-        """Get simulation Agent Profiles"""
+        """Gets Agent Profiles for the simulation"""
         state = self._load_simulation_state(simulation_id)
         if not state:
             raise ValueError(f"Simulation does not exist: {simulation_id}")
@@ -496,7 +487,7 @@ class SimulationManager:
             return json.load(f)
     
     def get_simulation_config(self, simulation_id: str) -> Optional[Dict[str, Any]]:
-        """Get simulation configuration"""
+        """Gets simulation configuration"""
         sim_dir = self._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
         
@@ -507,7 +498,7 @@ class SimulationManager:
             return json.load(f)
     
     def get_run_instructions(self, simulation_id: str) -> Dict[str, str]:
-        """Get run instructions"""
+        """Gets run instructions"""
         sim_dir = self._get_simulation_dir(simulation_id)
         config_path = os.path.join(sim_dir, "simulation_config.json")
         scripts_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts'))
@@ -522,14 +513,10 @@ class SimulationManager:
                 "parallel": f"python {scripts_dir}/run_parallel_simulation.py --config {config_path}",
             },
             "instructions": (
-                f"1. Activate conda environment: conda activate MiroFish
-"
-                f"2. Run simulation (scripts located in {scripts_dir}):
-"
-                f"   - Run Twitter only: python {scripts_dir}/run_twitter_simulation.py --config {config_path}
-"
-                f"   - Run Reddit only: python {scripts_dir}/run_reddit_simulation.py --config {config_path}
-"
-                f"   - Run dual-platform in parallel: python {scripts_dir}/run_parallel_simulation.py --config {config_path}"
+                f"1. Activate environment: conda activate MiroFish\n"
+                f"2. Run simulation (scripts located in {scripts_dir}):\n"
+                f"   - Run Twitter separately: python {scripts_dir}/run_twitter_simulation.py --config {config_path}\n"
+                f"   - Run Reddit separately: python {scripts_dir}/run_reddit_simulation.py --config {config_path}\n"
+                f"   - Run both in parallel: python {scripts_dir}/run_parallel_simulation.py --config {config_path}"
             )
         }

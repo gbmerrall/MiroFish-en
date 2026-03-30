@@ -1,7 +1,8 @@
-"""Zep Graph Paging Tool.
+"""Zep Graph Paginated Reading Tool.
 
-Zep's node/edge list interfaces use UUID cursor for pagination,
-this module encapsulates automatic paging logic (including single-page retry), returning the complete list transparently to the caller.
+Zep's node/edge list interface uses UUID cursors for pagination.
+This module encapsulates auto-pagination logic (including single-page retries), 
+returning the complete list transparently to the caller.
 """
 
 from __future__ import annotations
@@ -31,7 +32,7 @@ def _fetch_page_with_retry(
     page_description: str = "page",
     **kwargs: Any,
 ) -> list[Any]:
-    """Single page request, with exponential backoff retry on failure. Only retries transient network/IO errors."""
+    """Single page request, exponential backoff retry on failure. Only retries network/IO transient errors."""
     if max_retries < 1:
         raise ValueError("max_retries must be >= 1")
 
@@ -64,7 +65,7 @@ def fetch_all_nodes(
     max_retries: int = _DEFAULT_MAX_RETRIES,
     retry_delay: float = _DEFAULT_RETRY_DELAY,
 ) -> list[Any]:
-    """Fetches all graph nodes with pagination, returning up to max_items (default 2000). Each page request includes retries."""
+    """Fetches graph nodes with pagination, returns at most max_items (default 2000). Each page request includes retries."""
     all_nodes: list[Any] = []
     cursor: str | None = None
     page_num = 0
@@ -109,7 +110,7 @@ def fetch_all_edges(
     max_retries: int = _DEFAULT_MAX_RETRIES,
     retry_delay: float = _DEFAULT_RETRY_DELAY,
 ) -> list[Any]:
-    """Fetches all graph edges with pagination, returning the complete list. Each page request includes retries."""
+    """Fetches all edges of a graph with pagination, returns full list. Each page request includes retries."""
     all_edges: list[Any] = []
     cursor: str | None = None
     page_num = 0
